@@ -26,11 +26,13 @@ import {
   Clock, 
   CheckCircle2,
   Truck,
-  AlertTriangle
+  AlertTriangle,
+  ArrowRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { isValidTransition, getAvailableTransitions, getStageName } from '@/lib/fulfillmentRules';
 
 interface OrderDetailSheetProps {
   order: Order | null;
@@ -38,15 +40,10 @@ interface OrderDetailSheetProps {
   onOpenChange: (open: boolean) => void;
   onStatusChange: (status: FulfillmentStage) => void;
   onUpdateOrder: (order: Order) => void;
+  isShipping?: boolean;
 }
 
-const actionButtons: { status: FulfillmentStage; label: string; icon: typeof CheckCircle2 }[] = [
-  { status: 'pick', label: 'Mark Picked', icon: Package },
-  { status: 'pack', label: 'Mark Packed', icon: Package },
-  { status: 'label', label: 'Mark Labeled', icon: Package },
-];
-
-const carriers = ['FedEx', 'UPS', 'DHL', 'USPS', 'Other'];
+const carriers = ['FedEx', 'UPS', 'DHL', 'USPS', 'Estafeta', 'RedPack', 'Other'];
 
 export function OrderDetailSheet({ 
   order, 
@@ -101,14 +98,18 @@ export function OrderDetailSheet({
     setCarrier('');
   };
 
-  const getNextAction = () => {
-    const stageOrder: FulfillmentStage[] = ['new', 'qc', 'pick', 'pack', 'label'];
-    const currentIndex = stageOrder.indexOf(order.fulfillmentStage);
-    if (currentIndex === -1 || currentIndex >= stageOrder.length - 1) return null;
-    return actionButtons.find(btn => btn.status === stageOrder[currentIndex + 1]);
-  };
+  // Get available transitions based on fulfillment rules
+  const availableTransitions = getAvailableTransitions(order);
+  const nextStage = availableTransitions.find(s => s !== 'issue' && s !== order.fulfillmentStage);
 
-  const nextAction = getNextAction();
+  const handleStageTransition = (newStage: FulfillmentStage) => {
+    const validation = isValidTransition(order, order.fulfillmentStage, newStage);
+    if (!validation.valid) {
+      toast.error(validation.message || 'Invalid transition');
+      return;
+    }
+    onStatusChange(newStage);
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -124,28 +125,65 @@ export function OrderDetailSheet({
         </SheetHeader>
 
         <div className="space-y-6">
-          {/* Quick Actions */}
-          {order.fulfillmentStage !== 'shipped' && order.fulfillmentStage !== 'issue' && (
+          {/* Quick Actions - Workflow */}
+          {order.fulfillmentStage !== 'shipped' && (
             <div className="space-y-3">
-              <h4 className="font-semibold text-sm text-foreground">Quick Actions</h4>
+              <h4 className="font-semibold text-sm text-foreground">Workflow Actions</h4>
+              
+              {/* Current stage indicator */}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded-lg">
+                <span>Current:</span>
+                <StatusBadge status={order.fulfillmentStage} size="sm" />
+                {nextStage && (
+                  <>
+                    <ArrowRight className="w-4 h-4" />
+                    <span className="font-medium text-foreground">{getStageName(nextStage)}</span>
+                  </>
+                )}
+              </div>
+
               <div className="flex flex-wrap gap-2">
-                {nextAction && (
+                {/* Next stage button */}
+                {nextStage && nextStage !== 'shipped' && (
                   <Button 
-                    onClick={() => onStatusChange(nextAction.status)}
+                    onClick={() => handleStageTransition(nextStage)}
                     className="gap-2"
                   >
-                    <nextAction.icon className="w-4 h-4" />
-                    {nextAction.label}
+                    <CheckCircle2 className="w-4 h-4" />
+                    Move to {getStageName(nextStage)}
                   </Button>
                 )}
-                <Button 
-                  variant="destructive" 
-                  onClick={() => onStatusChange('issue')}
-                  className="gap-2"
-                >
-                  <AlertTriangle className="w-4 h-4" />
-                  Mark Issue
-                </Button>
+                
+                {/* Issue button - always available unless already shipped */}
+                {order.fulfillmentStage !== 'issue' && (
+                  <Button 
+                    variant="destructive" 
+                    onClick={() => handleStageTransition('issue')}
+                    className="gap-2"
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    Mark Issue
+                  </Button>
+                )}
+
+                {/* Resolve issue - show available stages to return to */}
+                {order.fulfillmentStage === 'issue' && (
+                  <div className="w-full space-y-2">
+                    <p className="text-xs text-muted-foreground">Resolve issue by moving to:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {availableTransitions.filter(s => s !== 'issue').map(stage => (
+                        <Button 
+                          key={stage}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleStageTransition(stage)}
+                        >
+                          {getStageName(stage)}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
