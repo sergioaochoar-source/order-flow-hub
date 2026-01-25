@@ -4,25 +4,55 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { Link, Bell, Database, CheckCircle2, XCircle } from 'lucide-react';
+import { Link, Bell, Database, CheckCircle2, XCircle, Key, Truck } from 'lucide-react';
 import { useApiConfig } from '@/hooks/useApiConfig';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { OrderStatus } from '@/types/order';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+const orderStatuses: { value: OrderStatus; label: string }[] = [
+  { value: 'processing', label: 'Processing' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'on-hold', label: 'On Hold' },
+];
 
 export default function Settings() {
-  const { apiUrl, isConfigured, saveApiUrl, clearApiUrl } = useApiConfig();
+  const { 
+    apiUrl, 
+    apiToken, 
+    shippedStatus, 
+    isConfigured, 
+    saveApiUrl, 
+    saveApiToken, 
+    saveShippedStatus, 
+    clearApiUrl 
+  } = useApiConfig();
+  
   const [inputUrl, setInputUrl] = useState(apiUrl);
+  const [inputToken, setInputToken] = useState(apiToken);
+  const [selectedShippedStatus, setSelectedShippedStatus] = useState<OrderStatus>(shippedStatus);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
     setInputUrl(apiUrl);
-  }, [apiUrl]);
+    setInputToken(apiToken);
+    setSelectedShippedStatus(shippedStatus);
+  }, [apiUrl, apiToken, shippedStatus]);
 
   const handleSave = () => {
     saveApiUrl(inputUrl);
-    toast.success('API Base URL saved successfully');
+    saveApiToken(inputToken);
+    saveShippedStatus(selectedShippedStatus);
+    toast.success('Settings saved successfully');
   };
 
   const handleTestConnection = async () => {
@@ -35,9 +65,18 @@ export default function Settings() {
     setTestResult(null);
 
     try {
-      const response = await fetch(`${inputUrl.replace(/\/+$/, '')}/orders`, {
+      const headers: Record<string, string> = { 
+        'Content-Type': 'application/json' 
+      };
+      
+      if (inputToken) {
+        headers['X-PEPTIUM-KEY'] = inputToken;
+        headers['Authorization'] = `Bearer ${inputToken}`;
+      }
+
+      const response = await fetch(`${inputUrl.replace(/\/+$/, '')}/orders?limit=1`, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
       });
 
       if (response.ok) {
@@ -112,9 +151,27 @@ export default function Settings() {
               Example: https://api.yourbackend.com (without trailing slash)
             </p>
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="api-token" className="flex items-center gap-2">
+              <Key className="w-4 h-4" />
+              API Token (optional)
+            </Label>
+            <Input 
+              id="api-token" 
+              type="password"
+              placeholder="Your API token or key" 
+              value={inputToken}
+              onChange={(e) => setInputToken(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Will be sent as X-PEPTIUM-KEY and Authorization: Bearer headers
+            </p>
+          </div>
+
           <div className="flex gap-3">
             <Button onClick={handleSave} disabled={!inputUrl}>
-              Save API Settings
+              Save Settings
             </Button>
             <Button 
               variant="outline" 
@@ -130,13 +187,45 @@ export default function Settings() {
                 onClick={() => {
                   clearApiUrl();
                   setInputUrl('');
+                  setInputToken('');
                   setTestResult(null);
-                  toast.success('API configuration cleared');
+                  toast.success('Configuration cleared');
                 }}
               >
                 Clear
               </Button>
             )}
+          </div>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Fulfillment Settings */}
+      <div className="bg-card rounded-xl border shadow-sm p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Truck className="w-5 h-5 text-primary" />
+          <h2 className="font-semibold text-foreground">Fulfillment Settings</h2>
+        </div>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="shipped-status">Order Status After Shipping</Label>
+            <Select 
+              value={selectedShippedStatus} 
+              onValueChange={(value) => setSelectedShippedStatus(value as OrderStatus)}
+            >
+              <SelectTrigger id="shipped-status" className="w-full">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                {orderStatuses.map(s => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              When tracking is added, set the WooCommerce order status to this value
+            </p>
           </div>
         </div>
       </div>

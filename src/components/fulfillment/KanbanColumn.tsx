@@ -1,15 +1,15 @@
-import { FulfillmentStatus, Order } from '@/types/order';
+import { FulfillmentStage, Order } from '@/types/order';
 import { OrderCard } from './OrderCard';
 import { cn } from '@/lib/utils';
 
 interface KanbanColumnProps {
-  status: FulfillmentStatus;
+  status: FulfillmentStage;
   orders: Order[];
   onOrderClick: (order: Order) => void;
-  onDrop?: (orderId: string, newStatus: FulfillmentStatus) => void;
+  onDrop?: (orderId: string, newStatus: FulfillmentStage) => void;
 }
 
-const columnConfig: Record<FulfillmentStatus, { title: string; color: string }> = {
+const columnConfig: Record<FulfillmentStage, { title: string; color: string }> = {
   new: { title: 'New / Paid', color: 'bg-status-new' },
   qc: { title: 'QC', color: 'bg-status-qc' },
   pick: { title: 'Pick', color: 'bg-status-pick' },

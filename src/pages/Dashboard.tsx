@@ -12,7 +12,7 @@ import { StatusBadge } from '@/components/fulfillment/StatusBadge';
 import { formatDistanceToNow } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { useOrders } from '@/hooks/useOrders';
+import { useAllOrders } from '@/hooks/useOrders';
 import { useDashboardMetrics } from '@/hooks/useMetrics';
 import { ApiNotConfigured } from '@/components/ApiNotConfigured';
 import { LoadingState } from '@/components/LoadingState';
@@ -21,21 +21,21 @@ import { isApiConfigured } from '@/lib/api';
 import { useMemo } from 'react';
 
 export default function Dashboard() {
-  const { data: orders = [], isLoading: ordersLoading, isError: ordersError, error: ordersErrorData, refetch: refetchOrders } = useOrders();
-  const { data: metrics, isLoading: metricsLoading, isError: metricsError } = useDashboardMetrics();
+  const { data: orders = [], isLoading: ordersLoading, isError: ordersError, error: ordersErrorData, refetch: refetchOrders } = useAllOrders();
+  const { data: metrics, isLoading: metricsLoading } = useDashboardMetrics();
 
   // Calculate metrics from orders if metrics endpoint not available
   const calculatedMetrics = useMemo(() => {
     if (metrics) return metrics;
     
-    const pendingOrders = orders.filter(o => !['shipped', 'issue'].includes(o.status)).length;
-    const issueOrders = orders.filter(o => o.status === 'issue').length;
-    const readyToShip = orders.filter(o => o.status === 'label').length;
+    const pendingOrders = orders.filter(o => !['shipped', 'issue'].includes(o.fulfillmentStage)).length;
+    const issueOrders = orders.filter(o => o.fulfillmentStage === 'issue').length;
+    const readyToShip = orders.filter(o => o.fulfillmentStage === 'label').length;
     const totalOrders = orders.length;
     const totalSales = orders.reduce((sum, o) => sum + o.total, 0);
     
     return {
-      todaySales: totalSales * 0.15, // Approximate
+      todaySales: totalSales * 0.15,
       weekSales: totalSales * 0.5,
       monthSales: totalSales,
       pendingOrders,
@@ -47,7 +47,7 @@ export default function Dashboard() {
   }, [orders, metrics]);
 
   const recentOrders = orders.slice(0, 5);
-  const issueOrders = orders.filter(o => o.status === 'issue').slice(0, 3);
+  const issueOrders = orders.filter(o => o.fulfillmentStage === 'issue').slice(0, 3);
 
   // Show configuration prompt if API not set
   if (!isApiConfigured()) {
@@ -164,7 +164,7 @@ export default function Dashboard() {
                         {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
                       </p>
                     </div>
-                    <StatusBadge status={order.status} />
+                    <StatusBadge status={order.fulfillmentStage} />
                   </div>
                 </div>
               ))}

@@ -1,12 +1,12 @@
-import { FulfillmentStatus } from '@/types/order';
+import { FulfillmentStage } from '@/types/order';
 import { cn } from '@/lib/utils';
 
 interface StatusBadgeProps {
-  status: FulfillmentStatus;
+  status: FulfillmentStage;
   size?: 'sm' | 'md';
 }
 
-const statusConfig: Record<FulfillmentStatus, { label: string; className: string }> = {
+const statusConfig: Record<FulfillmentStage, { label: string; className: string }> = {
   new: { label: 'New', className: 'status-new' },
   qc: { label: 'QC', className: 'status-qc' },
   pick: { label: 'Pick', className: 'status-pick' },
