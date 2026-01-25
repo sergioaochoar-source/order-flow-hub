@@ -460,6 +460,17 @@ Deno.serve(async (req) => {
     if (path === "webhooks/woocommerce" && req.method === "POST") {
       const signature = req.headers.get("X-WC-Webhook-Signature");
       const topic = req.headers.get("X-WC-Webhook-Topic") || "";
+      const contentType = req.headers.get("Content-Type") || "";
+
+      // Handle WooCommerce ping/verification request (sends webhook_id=N as form-urlencoded)
+      if (!topic || contentType.includes("application/x-www-form-urlencoded")) {
+        const text = await req.text();
+        console.log(`[WooCommerce Webhook] Ping received: ${text}`);
+        return new Response(JSON.stringify({ ok: true, message: "Webhook verified" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const body = await req.json();
 
       console.log(`[WooCommerce Webhook] Topic: ${topic}, Signature: ${signature ? "present" : "missing"}`);
