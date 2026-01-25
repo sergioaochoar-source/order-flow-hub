@@ -22,10 +22,9 @@ import {
 } from '@/components/ui/table';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
-import { ApiNotConfigured } from '@/components/ApiNotConfigured';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
-import { isApiConfigured } from '@/lib/api';
+import { EmptyOrdersState } from '@/components/EmptyOrdersState';
 
 const orderStatuses: { value: OrderStatus; label: string }[] = [
   { value: 'pending', label: 'Pending' },
@@ -96,11 +95,6 @@ export default function Orders() {
     setSelectedOrder(updatedOrder);
   };
 
-  // Show configuration prompt if API not set
-  if (!isApiConfigured()) {
-    return <ApiNotConfigured />;
-  }
-
   // Loading state
   if (isLoading) {
     return <LoadingState message="Loading orders..." />;
@@ -113,6 +107,19 @@ export default function Orders() {
         message={error instanceof Error ? error.message : 'Failed to load orders'} 
         onRetry={() => refetch()}
       />
+    );
+  }
+
+  // Empty state (no filters applied)
+  if (orders.length === 0 && !filters.q && !filters.status && !filters.stage) {
+    return (
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Orders</h1>
+          <p className="text-muted-foreground">0 orders total</p>
+        </div>
+        <EmptyOrdersState />
+      </div>
     );
   }
 
@@ -193,7 +200,7 @@ export default function Orders() {
             {orders.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  {filters.q || filters.status || filters.stage ? 'No orders match your filters' : 'No orders found'}
+                  No orders match your filters
                 </TableCell>
               </TableRow>
             ) : (

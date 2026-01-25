@@ -3,10 +3,9 @@ import { FulfillmentStage, Order } from '@/types/order';
 import { KanbanColumn } from './KanbanColumn';
 import { OrderDetailSheet } from './OrderDetailSheet';
 import { useAllOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
-import { ApiNotConfigured } from '@/components/ApiNotConfigured';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
-import { isApiConfigured } from '@/lib/api';
+import { EmptyOrdersState } from '@/components/EmptyOrdersState';
 import { isValidTransition } from '@/lib/fulfillmentRules';
 import { toast } from 'sonner';
 
@@ -68,11 +67,6 @@ export function FulfillmentBoard() {
     setSelectedOrder(updatedOrder);
   };
 
-  // Show configuration prompt if API not set
-  if (!isApiConfigured()) {
-    return <ApiNotConfigured />;
-  }
-
   // Loading state
   if (isLoading) {
     return <LoadingState message="Loading orders..." />;
@@ -86,6 +80,11 @@ export function FulfillmentBoard() {
         onRetry={() => refetch()}
       />
     );
+  }
+
+  // Empty state
+  if (orders.length === 0) {
+    return <EmptyOrdersState />;
   }
 
   return (

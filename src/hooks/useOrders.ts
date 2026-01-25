@@ -5,8 +5,8 @@ import {
   updateOrderStatus, 
   addOrderTracking,
   updateOrderNotes,
-  isApiConfigured 
-} from '@/lib/api';
+  isCloudApiConfigured 
+} from '@/lib/cloudApi';
 import { Order, FulfillmentStage, OrderFilters, PaginatedResponse, TrackingPayload } from '@/types/order';
 import { toast } from 'sonner';
 
@@ -24,7 +24,7 @@ export function useOrders(filters: OrderFilters = {}) {
   return useQuery({
     queryKey: orderKeys.list(filters),
     queryFn: () => fetchOrders(filters),
-    enabled: isApiConfigured(),
+    enabled: isCloudApiConfigured(),
     staleTime: 30 * 1000,
     refetchInterval: 60 * 1000,
     select: (data: PaginatedResponse<Order>) => data,
@@ -36,7 +36,7 @@ export function useAllOrders() {
   return useQuery({
     queryKey: orderKeys.lists(),
     queryFn: () => fetchOrders({ limit: 1000 }),
-    enabled: isApiConfigured(),
+    enabled: isCloudApiConfigured(),
     staleTime: 30 * 1000,
     refetchInterval: 60 * 1000,
     select: (data: PaginatedResponse<Order>) => data.data,
@@ -48,7 +48,7 @@ export function useOrder(id: string) {
   return useQuery({
     queryKey: orderKeys.detail(id),
     queryFn: () => fetchOrderById(id),
-    enabled: isApiConfigured() && !!id,
+    enabled: isCloudApiConfigured() && !!id,
   });
 }
 
@@ -230,7 +230,8 @@ export function useUpdateOrderNotes() {
       queryClient.invalidateQueries({ queryKey: orderKeys.lists() });
     },
     onError: (err) => {
-      toast.error(`Failed to update notes: ${err.message}`);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to update notes: ${errorMessage}`);
     },
   });
 }
