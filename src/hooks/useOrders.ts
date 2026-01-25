@@ -114,7 +114,13 @@ export function useUpdateOrderStatus() {
           }
         });
       }
-      toast.error(`Failed to update status: ${err.message}`);
+      
+      // Show user-friendly error from backend
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(errorMessage, {
+        description: 'The server rejected this status change.',
+        duration: 5000,
+      });
     },
     
     onSuccess: (data, { status }) => {
@@ -191,7 +197,13 @@ export function useAddTracking() {
           }
         });
       }
-      toast.error(`Failed to add tracking: ${err.message}`);
+      
+      // Show user-friendly error from backend
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(errorMessage, {
+        description: 'Failed to save tracking information.',
+        duration: 5000,
+      });
     },
     
     onSuccess: (data) => {

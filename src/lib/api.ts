@@ -61,10 +61,28 @@ export class ApiError extends Error {
     message: string,
     public status?: number,
     public statusText?: string,
+    public code?: string,
     public data?: unknown
   ) {
     super(message);
     this.name = 'ApiError';
+  }
+
+  /**
+   * Extract user-friendly message from API error response
+   */
+  static parseMessage(data: unknown, fallback: string): string {
+    if (!data || typeof data !== 'object') return fallback;
+    
+    const obj = data as Record<string, unknown>;
+    // Support various error response formats
+    if (typeof obj.message === 'string') return obj.message;
+    if (typeof obj.error === 'string') return obj.error;
+    if (typeof obj.detail === 'string') return obj.detail;
+    if (obj.errors && Array.isArray(obj.errors) && obj.errors.length > 0) {
+      return String(obj.errors[0]);
+    }
+    return fallback;
   }
 }
 
@@ -109,10 +127,22 @@ async function apiClient<T>(
       errorData = null;
     }
     
+    // Parse error code from response
+    const errorCode = errorData && typeof errorData === 'object' 
+      ? (errorData as Record<string, unknown>).code as string | undefined
+      : undefined;
+    
+    // Get user-friendly message
+    const message = ApiError.parseMessage(
+      errorData, 
+      `API Error: ${response.status} ${response.statusText}`
+    );
+    
     throw new ApiError(
-      `API Error: ${response.statusText}`,
+      message,
       response.status,
       response.statusText,
+      errorCode,
       errorData
     );
   }
@@ -164,17 +194,42 @@ export async function fetchOrderById(id: string): Promise<Order> {
   return normalizeOrder(rawOrder);
 }
 
+/**
+ * PATCH /orders/:id/status
+ * 
+ * Expected payload:
+ * {
+ *   stage: FulfillmentStage  // new, qc, pick, pack, label, shipped, issue
+ * }
+ * 
+ * Backend may reject invalid transitions with 400/422 and error message.
+ * Returns: Updated Order object
+ */
 export async function updateOrderStatus(
   orderId: string,
   stage: FulfillmentStage
 ): Promise<Order> {
   const rawOrder = await apiClient<Record<string, unknown>>(`/orders/${orderId}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ status: stage, stage }),
+    body: JSON.stringify({ stage }),
   });
   return normalizeOrder(rawOrder);
 }
 
+/**
+ * POST /orders/:id/tracking
+ * 
+ * Expected payload:
+ * {
+ *   carrier: string       // Required: FedEx, UPS, DHL, etc.
+ *   tracking: string      // Required: Tracking number
+ *   service?: string      // Optional: Service type (e.g., "Express", "Ground")
+ *   shippedAt?: string    // Optional: ISO timestamp (defaults to now on backend)
+ *   orderStatus?: string  // Optional: WooCommerce status to set (from settings)
+ * }
+ * 
+ * Returns: Updated Order object with shipment info populated
+ */
 export async function addOrderTracking(
   orderId: string,
   payload: TrackingPayload
@@ -184,7 +239,10 @@ export async function addOrderTracking(
   const rawOrder = await apiClient<Record<string, unknown>>(`/orders/${orderId}/tracking`, {
     method: 'POST',
     body: JSON.stringify({
-      ...payload,
+      carrier: payload.carrier,
+      tracking: payload.tracking,
+      service: payload.service,
+      shippedAt: payload.shippedAt,
       orderStatus: shippedStatus,
     }),
   });
