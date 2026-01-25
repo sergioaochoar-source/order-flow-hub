@@ -14,17 +14,24 @@ export function isValidTransition(
   fromStage: FulfillmentStage,
   toStage: FulfillmentStage
 ): { valid: boolean; message?: string } {
-  // Issue is special - can move TO issue from anywhere, but moving FROM issue requires going back to appropriate stage
+  // Issue is special - can move TO issue from anywhere
   if (toStage === 'issue') {
     return { valid: true };
   }
 
-  // Cannot move from Issue without explicit resolution
+  // From Issue, allow moving back to any stage except shipped (requires tracking)
   if (fromStage === 'issue') {
-    return {
-      valid: false,
-      message: 'Orders in Issue must be resolved manually. Move back to the appropriate stage first.',
-    };
+    const allowedFromIssue: FulfillmentStage[] = ['new', 'qc', 'pick', 'pack', 'label'];
+    if (allowedFromIssue.includes(toStage)) {
+      return { valid: true };
+    }
+    // Cannot go directly from issue to shipped
+    if (toStage === 'shipped') {
+      return {
+        valid: false,
+        message: 'Cannot ship directly from Issue. Move to Label stage first and add tracking.',
+      };
+    }
   }
 
   // Cannot skip to Shipped - must have tracking
