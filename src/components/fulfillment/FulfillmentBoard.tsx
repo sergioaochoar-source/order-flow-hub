@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { FulfillmentStage, Order } from '@/types/order';
 import { KanbanColumn } from './KanbanColumn';
 import { OrderDetailSheet } from './OrderDetailSheet';
-import { useAllOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
+import { useAllOrders, useUpdateOrderStatus, useAddTracking } from '@/hooks/useOrders';
 import { ApiNotConfigured } from '@/components/ApiNotConfigured';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
@@ -16,6 +16,7 @@ export function FulfillmentBoard() {
   
   const { data: orders = [], isLoading, isError, error, refetch } = useAllOrders();
   const updateStatusMutation = useUpdateOrderStatus();
+  const addTrackingMutation = useAddTracking();
 
   const ordersByStage = useMemo(() => {
     const grouped: Record<FulfillmentStage, Order[]> = {
@@ -50,8 +51,30 @@ export function FulfillmentBoard() {
   };
 
   const handleUpdateOrder = (updatedOrder: Order) => {
-    setSelectedOrder(updatedOrder);
-    // The mutation will handle the server update and cache invalidation
+    // If the order is being marked as shipped with tracking, call the backend
+    if (updatedOrder.fulfillmentStage === 'shipped' && updatedOrder.shipment) {
+      addTrackingMutation.mutate(
+        {
+          orderId: updatedOrder.id,
+          payload: {
+            carrier: updatedOrder.shipment.carrier,
+            tracking: updatedOrder.shipment.trackingNumber,
+            service: updatedOrder.shipment.service,
+            shippedAt: updatedOrder.shipment.shippedAt,
+          },
+        },
+        {
+          onSuccess: () => {
+            // Close sheet after successful backend update
+            setIsSheetOpen(false);
+            setSelectedOrder(null);
+          },
+        }
+      );
+    } else {
+      // For non-tracking updates, just update local state
+      setSelectedOrder(updatedOrder);
+    }
   };
 
   // Show configuration prompt if API not set

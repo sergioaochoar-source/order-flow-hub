@@ -66,6 +66,7 @@ export function OrderDetailSheet({
       return;
     }
 
+    // Create the updated order with shipping info - the parent will call the mutation
     const updatedOrder: Order = {
       ...order,
       fulfillmentStage: 'shipped',
@@ -94,8 +95,8 @@ export function OrderDetailSheet({
       ]
     };
 
+    // Let the parent handle the mutation - toast will be shown by useAddTracking
     onUpdateOrder(updatedOrder);
-    toast.success('Order marked as shipped!');
     setTrackingNumber('');
     setCarrier('');
   };
