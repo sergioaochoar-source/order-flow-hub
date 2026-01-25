@@ -14,7 +14,177 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      order_events: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          meta: Json | null
+          order_id: string
+          type: string
+          user_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          meta?: Json | null
+          order_id: string
+          type: string
+          user_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          meta?: Json | null
+          order_id?: string
+          type?: string
+          user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_items: {
+        Row: {
+          id: string
+          image_url: string | null
+          name: string
+          order_id: string
+          price: number
+          quantity: number
+          sku: string | null
+        }
+        Insert: {
+          id?: string
+          image_url?: string | null
+          name: string
+          order_id: string
+          price?: number
+          quantity?: number
+          sku?: string | null
+        }
+        Update: {
+          id?: string
+          image_url?: string | null
+          name?: string
+          order_id?: string
+          price?: number
+          quantity?: number
+          sku?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          billing_address: Json | null
+          created_at: string
+          currency: string | null
+          customer_email: string | null
+          customer_name: string | null
+          fulfillment_stage: string
+          id: string
+          notes: string | null
+          order_number: string
+          paid_at: string | null
+          shipping_address: Json | null
+          shipping_method: string | null
+          status: string
+          total: number
+          updated_at: string
+          wc_order_id: string | null
+        }
+        Insert: {
+          billing_address?: Json | null
+          created_at?: string
+          currency?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          fulfillment_stage?: string
+          id?: string
+          notes?: string | null
+          order_number: string
+          paid_at?: string | null
+          shipping_address?: Json | null
+          shipping_method?: string | null
+          status?: string
+          total?: number
+          updated_at?: string
+          wc_order_id?: string | null
+        }
+        Update: {
+          billing_address?: Json | null
+          created_at?: string
+          currency?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          fulfillment_stage?: string
+          id?: string
+          notes?: string | null
+          order_number?: string
+          paid_at?: string | null
+          shipping_address?: Json | null
+          shipping_method?: string | null
+          status?: string
+          total?: number
+          updated_at?: string
+          wc_order_id?: string | null
+        }
+        Relationships: []
+      }
+      shipments: {
+        Row: {
+          carrier: string
+          estimated_delivery: string | null
+          order_id: string
+          service: string | null
+          shipped_at: string | null
+          tracking_number: string
+          updated_at: string
+        }
+        Insert: {
+          carrier: string
+          estimated_delivery?: string | null
+          order_id: string
+          service?: string | null
+          shipped_at?: string | null
+          tracking_number: string
+          updated_at?: string
+        }
+        Update: {
+          carrier?: string
+          estimated_delivery?: string | null
+          order_id?: string
+          service?: string | null
+          shipped_at?: string | null
+          tracking_number?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

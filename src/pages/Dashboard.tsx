@@ -14,10 +14,9 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAllOrders } from '@/hooks/useOrders';
 import { useDashboardMetrics } from '@/hooks/useMetrics';
-import { ApiNotConfigured } from '@/components/ApiNotConfigured';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
-import { isApiConfigured } from '@/lib/api';
+import { EmptyOrdersState } from '@/components/EmptyOrdersState';
 import { useMemo } from 'react';
 
 export default function Dashboard() {
@@ -49,11 +48,6 @@ export default function Dashboard() {
   const recentOrders = orders.slice(0, 5);
   const issueOrders = orders.filter(o => o.fulfillmentStage === 'issue').slice(0, 3);
 
-  // Show configuration prompt if API not set
-  if (!isApiConfigured()) {
-    return <ApiNotConfigured />;
-  }
-
   // Loading state
   if (ordersLoading || metricsLoading) {
     return <LoadingState message="Loading dashboard..." />;
@@ -66,6 +60,24 @@ export default function Dashboard() {
         message={ordersErrorData instanceof Error ? ordersErrorData.message : 'Failed to load dashboard'} 
         onRetry={() => refetchOrders()}
       />
+    );
+  }
+
+  // Empty state - no orders yet
+  if (orders.length === 0) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+            <p className="text-muted-foreground">Overview of your fulfillment operations</p>
+          </div>
+        </div>
+        <EmptyOrdersState 
+          title="Welcome to Order Flow Hub!"
+          description="Your fulfillment dashboard is ready. Orders will appear here once they are synced from WooCommerce or added to the database."
+        />
+      </div>
     );
   }
 

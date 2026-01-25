@@ -28,10 +28,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useAllOrders, useAddTracking } from '@/hooks/useOrders';
-import { ApiNotConfigured } from '@/components/ApiNotConfigured';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
-import { isApiConfigured } from '@/lib/api';
+import { EmptyOrdersState } from '@/components/EmptyOrdersState';
 import { toast } from 'sonner';
 
 const carriers = ['FedEx', 'UPS', 'DHL', 'USPS', 'Other'];
@@ -77,11 +76,6 @@ export default function Shipping() {
     );
   };
 
-  // Show configuration prompt if API not set
-  if (!isApiConfigured()) {
-    return <ApiNotConfigured />;
-  }
-
   // Loading state
   if (isLoading) {
     return <LoadingState message="Loading shipping data..." />;
@@ -94,6 +88,22 @@ export default function Shipping() {
         message={error instanceof Error ? error.message : 'Failed to load shipping data'} 
         onRetry={() => refetch()}
       />
+    );
+  }
+
+  // Empty state
+  if (orders.length === 0) {
+    return (
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Shipping</h1>
+          <p className="text-muted-foreground">Manage shipments and tracking</p>
+        </div>
+        <EmptyOrdersState 
+          title="No Orders to Ship"
+          description="Orders ready to ship will appear here once they reach the 'Label' stage in the fulfillment process."
+        />
+      </div>
     );
   }
 
