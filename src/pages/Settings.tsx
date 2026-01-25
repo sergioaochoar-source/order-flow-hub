@@ -1,11 +1,70 @@
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { Settings as SettingsIcon, Link, Bell, Database } from 'lucide-react';
+import { Link, Bell, Database, CheckCircle2, XCircle } from 'lucide-react';
+import { useApiConfig } from '@/hooks/useApiConfig';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function Settings() {
+  const { apiUrl, isConfigured, saveApiUrl, clearApiUrl } = useApiConfig();
+  const [inputUrl, setInputUrl] = useState(apiUrl);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    setInputUrl(apiUrl);
+  }, [apiUrl]);
+
+  const handleSave = () => {
+    saveApiUrl(inputUrl);
+    toast.success('API Base URL saved successfully');
+  };
+
+  const handleTestConnection = async () => {
+    if (!inputUrl) {
+      toast.error('Please enter an API URL first');
+      return;
+    }
+
+    setIsTesting(true);
+    setTestResult(null);
+
+    try {
+      const response = await fetch(`${inputUrl.replace(/\/+$/, '')}/orders`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (response.ok) {
+        setTestResult('success');
+        toast.success('Connection successful!');
+      } else {
+        setTestResult('error');
+        toast.error(`Connection failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      setTestResult('error');
+      toast.error(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleRefreshData = () => {
+    queryClient.invalidateQueries();
+    toast.success('Data refresh triggered');
+  };
+
+  const handleClearCache = () => {
+    queryClient.clear();
+    toast.success('Cache cleared');
+  };
+
   return (
     <div className="p-6 max-w-2xl space-y-6">
       {/* Header */}
@@ -19,6 +78,12 @@ export default function Settings() {
         <div className="flex items-center gap-2 mb-4">
           <Link className="w-5 h-5 text-primary" />
           <h2 className="font-semibold text-foreground">API Configuration</h2>
+          {isConfigured && (
+            <span className="ml-auto text-xs bg-success/20 text-success px-2 py-1 rounded-full flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" />
+              Configured
+            </span>
+          )}
         </div>
         <p className="text-sm text-muted-foreground mb-4">
           Connect to your backend API that syncs with WooCommerce.
@@ -26,13 +91,53 @@ export default function Settings() {
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="api-url">API Base URL</Label>
-            <Input 
-              id="api-url" 
-              placeholder="https://api.yourbackend.com" 
-              defaultValue=""
-            />
+            <div className="flex gap-2">
+              <Input 
+                id="api-url" 
+                placeholder="https://api.yourbackend.com" 
+                value={inputUrl}
+                onChange={(e) => {
+                  setInputUrl(e.target.value);
+                  setTestResult(null);
+                }}
+              />
+              {testResult === 'success' && (
+                <CheckCircle2 className="w-6 h-6 text-success flex-shrink-0 self-center" />
+              )}
+              {testResult === 'error' && (
+                <XCircle className="w-6 h-6 text-destructive flex-shrink-0 self-center" />
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Example: https://api.yourbackend.com (without trailing slash)
+            </p>
           </div>
-          <Button>Save API Settings</Button>
+          <div className="flex gap-3">
+            <Button onClick={handleSave} disabled={!inputUrl}>
+              Save API Settings
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleTestConnection}
+              disabled={!inputUrl || isTesting}
+            >
+              {isTesting ? 'Testing...' : 'Test Connection'}
+            </Button>
+            {isConfigured && (
+              <Button 
+                variant="ghost" 
+                className="text-destructive hover:text-destructive"
+                onClick={() => {
+                  clearApiUrl();
+                  setInputUrl('');
+                  setTestResult(null);
+                  toast.success('API configuration cleared');
+                }}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -81,8 +186,12 @@ export default function Settings() {
           This app displays data from your connected API. All order data is synced from WooCommerce through your backend.
         </p>
         <div className="flex gap-3">
-          <Button variant="outline">Refresh Data</Button>
-          <Button variant="outline">Clear Cache</Button>
+          <Button variant="outline" onClick={handleRefreshData} disabled={!isConfigured}>
+            Refresh Data
+          </Button>
+          <Button variant="outline" onClick={handleClearCache}>
+            Clear Cache
+          </Button>
         </div>
       </div>
     </div>

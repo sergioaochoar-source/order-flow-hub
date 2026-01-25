@@ -1,16 +1,22 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { FulfillmentStatus, Order } from '@/types/order';
 import { KanbanColumn } from './KanbanColumn';
 import { OrderDetailSheet } from './OrderDetailSheet';
-import { mockOrders } from '@/lib/mockData';
-import { toast } from 'sonner';
+import { useOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
+import { ApiNotConfigured } from '@/components/ApiNotConfigured';
+import { LoadingState } from '@/components/LoadingState';
+import { ErrorState } from '@/components/ErrorState';
+import { isApiConfigured } from '@/lib/api';
+import { useState } from 'react';
 
 const statuses: FulfillmentStatus[] = ['new', 'qc', 'pick', 'pack', 'label', 'shipped', 'issue'];
 
 export function FulfillmentBoard() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  
+  const { data: orders = [], isLoading, isError, error, refetch } = useOrders();
+  const updateStatusMutation = useUpdateOrderStatus();
 
   const ordersByStatus = useMemo(() => {
     const grouped: Record<FulfillmentStatus, Order[]> = {
@@ -36,36 +42,38 @@ export function FulfillmentBoard() {
   };
 
   const handleStatusChange = (orderId: string, newStatus: FulfillmentStatus) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === orderId
-          ? { 
-              ...order, 
-              status: newStatus,
-              updatedAt: new Date().toISOString(),
-              events: [
-                ...order.events,
-                {
-                  id: `evt_${Date.now()}`,
-                  timestamp: new Date().toISOString(),
-                  type: 'status_change' as const,
-                  description: `Status changed to ${newStatus}`,
-                  user: 'Current User'
-                }
-              ]
-            }
-          : order
-      )
-    );
-    toast.success(`Order moved to ${newStatus.toUpperCase()}`);
+    updateStatusMutation.mutate({ orderId, status: newStatus });
+    
+    // Update selected order if it's the one being changed
+    if (selectedOrder?.id === orderId) {
+      setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
+    }
   };
 
   const handleUpdateOrder = (updatedOrder: Order) => {
-    setOrders((prev) =>
-      prev.map((order) => (order.id === updatedOrder.id ? updatedOrder : order))
-    );
     setSelectedOrder(updatedOrder);
+    // The mutation will handle the server update and cache invalidation
   };
+
+  // Show configuration prompt if API not set
+  if (!isApiConfigured()) {
+    return <ApiNotConfigured />;
+  }
+
+  // Loading state
+  if (isLoading) {
+    return <LoadingState message="Loading orders..." />;
+  }
+
+  // Error state
+  if (isError) {
+    return (
+      <ErrorState 
+        message={error instanceof Error ? error.message : 'Failed to load orders'} 
+        onRetry={() => refetch()}
+      />
+    );
+  }
 
   return (
     <div className="h-full">
@@ -88,7 +96,6 @@ export function FulfillmentBoard() {
         onStatusChange={(status) => {
           if (selectedOrder) {
             handleStatusChange(selectedOrder.id, status);
-            setSelectedOrder({ ...selectedOrder, status });
           }
         }}
         onUpdateOrder={handleUpdateOrder}
