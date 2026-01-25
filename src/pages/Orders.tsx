@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { mockOrders } from '@/lib/mockData';
 import { StatusBadge } from '@/components/fulfillment/StatusBadge';
 import { OrderDetailSheet } from '@/components/fulfillment/OrderDetailSheet';
 import { Order, FulfillmentStatus } from '@/types/order';
@@ -15,12 +14,19 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatDistanceToNow, format } from 'date-fns';
+import { useOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
+import { ApiNotConfigured } from '@/components/ApiNotConfigured';
+import { LoadingState } from '@/components/LoadingState';
+import { ErrorState } from '@/components/ErrorState';
+import { isApiConfigured } from '@/lib/api';
 
 export default function Orders() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const { data: orders = [], isLoading, isError, error, refetch } = useOrders();
+  const updateStatusMutation = useUpdateOrderStatus();
 
   const filteredOrders = orders.filter(order => 
     order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -30,23 +36,33 @@ export default function Orders() {
 
   const handleStatusChange = (status: FulfillmentStatus) => {
     if (!selectedOrder) return;
-    
-    setOrders(prev => 
-      prev.map(order => 
-        order.id === selectedOrder.id 
-          ? { ...order, status, updatedAt: new Date().toISOString() }
-          : order
-      )
-    );
+    updateStatusMutation.mutate({ orderId: selectedOrder.id, status });
     setSelectedOrder(prev => prev ? { ...prev, status } : null);
   };
 
   const handleUpdateOrder = (updatedOrder: Order) => {
-    setOrders(prev => 
-      prev.map(order => order.id === updatedOrder.id ? updatedOrder : order)
-    );
     setSelectedOrder(updatedOrder);
   };
+
+  // Show configuration prompt if API not set
+  if (!isApiConfigured()) {
+    return <ApiNotConfigured />;
+  }
+
+  // Loading state
+  if (isLoading) {
+    return <LoadingState message="Loading orders..." />;
+  }
+
+  // Error state
+  if (isError) {
+    return (
+      <ErrorState 
+        message={error instanceof Error ? error.message : 'Failed to load orders'} 
+        onRetry={() => refetch()}
+      />
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -94,38 +110,46 @@ export default function Orders() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredOrders.map((order) => (
-              <TableRow 
-                key={order.id} 
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={() => {
-                  setSelectedOrder(order);
-                  setIsSheetOpen(true);
-                }}
-              >
-                <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                <TableCell>
-                  <div>
-                    <p className="font-medium">{order.customer.name}</p>
-                    <p className="text-xs text-muted-foreground">{order.customer.email}</p>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <StatusBadge status={order.status} />
-                </TableCell>
-                <TableCell>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</TableCell>
-                <TableCell className="font-medium">${order.total.toFixed(2)}</TableCell>
-                <TableCell>{order.shippingMethod}</TableCell>
-                <TableCell>
-                  <div>
-                    <p className="text-sm">{format(new Date(order.createdAt), 'MMM d, yyyy')}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
-                    </p>
-                  </div>
+            {filteredOrders.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  {searchQuery ? 'No orders match your search' : 'No orders found'}
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              filteredOrders.map((order) => (
+                <TableRow 
+                  key={order.id} 
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => {
+                    setSelectedOrder(order);
+                    setIsSheetOpen(true);
+                  }}
+                >
+                  <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{order.customer.name}</p>
+                      <p className="text-xs text-muted-foreground">{order.customer.email}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={order.status} />
+                  </TableCell>
+                  <TableCell>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</TableCell>
+                  <TableCell className="font-medium">${order.total.toFixed(2)}</TableCell>
+                  <TableCell>{order.shippingMethod}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="text-sm">{format(new Date(order.createdAt), 'MMM d, yyyy')}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
+                      </p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

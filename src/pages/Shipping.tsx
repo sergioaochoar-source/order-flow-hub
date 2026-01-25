@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { mockOrders } from '@/lib/mockData';
 import { StatusBadge } from '@/components/fulfillment/StatusBadge';
-import { Order, FulfillmentStatus } from '@/types/order';
-import { Search, Truck, Package, CheckCircle2 } from 'lucide-react';
+import { Order } from '@/types/order';
+import { Truck, Package, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -28,46 +27,67 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { toast } from 'sonner';
+import { useOrders, useAddTracking } from '@/hooks/useOrders';
+import { ApiNotConfigured } from '@/components/ApiNotConfigured';
+import { LoadingState } from '@/components/LoadingState';
+import { ErrorState } from '@/components/ErrorState';
+import { isApiConfigured } from '@/lib/api';
 
 const carriers = ['FedEx', 'UPS', 'DHL', 'USPS', 'Other'];
 
 export default function Shipping() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [carrier, setCarrier] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
+
+  const { data: orders = [], isLoading, isError, error, refetch } = useOrders();
+  const addTrackingMutation = useAddTracking();
 
   const readyToShip = orders.filter(o => o.status === 'label');
   const recentlyShipped = orders.filter(o => o.status === 'shipped').slice(0, 10);
 
   const handleMarkShipped = () => {
     if (!selectedOrder || !carrier || !trackingNumber) {
-      toast.error('Please enter carrier and tracking number');
       return;
     }
 
-    setOrders(prev => 
-      prev.map(order => 
-        order.id === selectedOrder.id 
-          ? { 
-              ...order, 
-              status: 'shipped' as FulfillmentStatus,
-              carrier,
-              trackingNumber,
-              updatedAt: new Date().toISOString()
-            }
-          : order
-      )
+    addTrackingMutation.mutate(
+      { 
+        orderId: selectedOrder.id, 
+        carrier, 
+        trackingNumber 
+      },
+      {
+        onSuccess: () => {
+          setIsDialogOpen(false);
+          setSelectedOrder(null);
+          setCarrier('');
+          setTrackingNumber('');
+        }
+      }
     );
-
-    toast.success(`Order ${selectedOrder.orderNumber} marked as shipped!`);
-    setIsDialogOpen(false);
-    setSelectedOrder(null);
-    setCarrier('');
-    setTrackingNumber('');
   };
+
+  // Show configuration prompt if API not set
+  if (!isApiConfigured()) {
+    return <ApiNotConfigured />;
+  }
+
+  // Loading state
+  if (isLoading) {
+    return <LoadingState message="Loading shipping data..." />;
+  }
+
+  // Error state
+  if (isError) {
+    return (
+      <ErrorState 
+        message={error instanceof Error ? error.message : 'Failed to load shipping data'} 
+        onRetry={() => refetch()}
+      />
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -225,10 +245,10 @@ export default function Shipping() {
               <Button 
                 onClick={handleMarkShipped}
                 className="flex-1 gap-2"
-                disabled={!carrier || !trackingNumber}
+                disabled={!carrier || !trackingNumber || addTrackingMutation.isPending}
               >
                 <CheckCircle2 className="w-4 h-4" />
-                Mark as Shipped
+                {addTrackingMutation.isPending ? 'Saving...' : 'Mark as Shipped'}
               </Button>
             </div>
           </div>
