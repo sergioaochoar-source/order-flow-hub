@@ -56,7 +56,12 @@ Deno.serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/api\/?/, "").replace(/\/$/, "");
+  // Path can be /api/... or /functions/v1/api/...
+  const rawPath = url.pathname;
+  const path = rawPath
+    .replace(/^\/functions\/v1\/api\/?/, "")
+    .replace(/^\/api\/?/, "")
+    .replace(/\/$/, "");
   const pathParts = path.split("/").filter(Boolean);
 
   // Create Supabase client
@@ -447,6 +452,159 @@ Deno.serve(async (req) => {
       if (error) throw error;
 
       return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // POST /api/webhooks/woocommerce
+    if (path === "webhooks/woocommerce" && req.method === "POST") {
+      const signature = req.headers.get("X-WC-Webhook-Signature");
+      const topic = req.headers.get("X-WC-Webhook-Topic") || "";
+      const body = await req.json();
+
+      console.log(`[WooCommerce Webhook] Topic: ${topic}, Signature: ${signature ? "present" : "missing"}`);
+
+      // TODO: Validate signature with WC_WEBHOOK_SECRET when configured
+      // const secret = Deno.env.get("WC_WEBHOOK_SECRET");
+      // if (secret && !verifySignature(body, signature, secret)) {
+      //   return new Response(JSON.stringify({ error: "Invalid signature" }), {
+      //     status: 401,
+      //     headers: { ...corsHeaders, "Content-Type": "application/json" },
+      //   });
+      // }
+
+      // Normalize WooCommerce payload
+      const wcOrder = body;
+      const wcOrderId = String(wcOrder.id);
+      const orderNumber = wcOrder.number ? `#${wcOrder.number}` : `#${wcOrder.id}`;
+      
+      // Determine fulfillment stage based on topic and status
+      let fulfillmentStage = "new";
+      if (topic === "order.paid" || wcOrder.date_paid) {
+        fulfillmentStage = "new"; // Paid orders start in new
+      }
+
+      // Build shipping address
+      const shipping = wcOrder.shipping || {};
+      const shippingAddress = {
+        line1: shipping.address_1 || "",
+        line2: shipping.address_2 || "",
+        city: shipping.city || "",
+        state: shipping.state || "",
+        postalCode: shipping.postcode || "",
+        country: shipping.country || "",
+      };
+
+      // Build billing address
+      const billing = wcOrder.billing || {};
+      const billingAddress = {
+        line1: billing.address_1 || "",
+        line2: billing.address_2 || "",
+        city: billing.city || "",
+        state: billing.state || "",
+        postalCode: billing.postcode || "",
+        country: billing.country || "",
+      };
+
+      // Customer info
+      const customerName = `${billing.first_name || ""} ${billing.last_name || ""}`.trim() || 
+                          `${shipping.first_name || ""} ${shipping.last_name || ""}`.trim();
+      const customerEmail = billing.email || wcOrder.billing_email || "";
+
+      // Check if order exists
+      const { data: existingOrder } = await supabase
+        .from("orders")
+        .select("id, fulfillment_stage")
+        .eq("wc_order_id", wcOrderId)
+        .maybeSingle();
+
+      let orderId: string;
+
+      if (existingOrder) {
+        // Update existing order (don't overwrite fulfillment_stage if it's progressed)
+        orderId = existingOrder.id;
+        
+        const updateData: Record<string, unknown> = {
+          order_number: orderNumber,
+          status: wcOrder.status || "processing",
+          total: parseFloat(wcOrder.total) || 0,
+          currency: wcOrder.currency || "USD",
+          customer_name: customerName,
+          customer_email: customerEmail,
+          shipping_address: shippingAddress,
+          billing_address: billingAddress,
+          shipping_method: wcOrder.shipping_lines?.[0]?.method_title || "",
+        };
+
+        // Only set paid_at if this is a paid event
+        if (topic === "order.paid" && wcOrder.date_paid) {
+          updateData.paid_at = wcOrder.date_paid;
+        }
+
+        await supabase
+          .from("orders")
+          .update(updateData)
+          .eq("id", orderId);
+
+      } else {
+        // Insert new order
+        const { data: newOrder, error: insertError } = await supabase
+          .from("orders")
+          .insert({
+            wc_order_id: wcOrderId,
+            order_number: orderNumber,
+            status: wcOrder.status || "processing",
+            fulfillment_stage: fulfillmentStage,
+            total: parseFloat(wcOrder.total) || 0,
+            currency: wcOrder.currency || "USD",
+            customer_name: customerName,
+            customer_email: customerEmail,
+            shipping_address: shippingAddress,
+            billing_address: billingAddress,
+            shipping_method: wcOrder.shipping_lines?.[0]?.method_title || "",
+            paid_at: wcOrder.date_paid || null,
+          })
+          .select("id")
+          .single();
+
+        if (insertError) throw insertError;
+        orderId = newOrder.id;
+      }
+
+      // Upsert order items (delete existing and re-insert for simplicity)
+      if (wcOrder.line_items && Array.isArray(wcOrder.line_items)) {
+        // Delete existing items for this order
+        await supabase
+          .from("order_items")
+          .delete()
+          .eq("order_id", orderId);
+
+        // Insert new items
+        const items = wcOrder.line_items.map((item: Record<string, unknown>) => ({
+          order_id: orderId,
+          sku: item.sku || "",
+          name: item.name || "Unknown Item",
+          quantity: item.quantity || 1,
+          price: parseFloat(String(item.price)) || 0,
+          image_url: (item.image as Record<string, string>)?.src || null,
+        }));
+
+        if (items.length > 0) {
+          await supabase.from("order_items").insert(items);
+        }
+      }
+
+      // Create event for this webhook
+      await supabase.from("order_events").insert({
+        order_id: orderId,
+        type: "webhook_received",
+        message: `WooCommerce webhook: ${topic}`,
+        meta: { topic, wc_order_id: wcOrderId, status: wcOrder.status },
+      });
+
+      console.log(`[WooCommerce Webhook] Processed order ${orderId} (WC: ${wcOrderId})`);
+
+      return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
