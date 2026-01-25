@@ -26,11 +26,11 @@ export function OrderCard({ order, onClick, isDragging }: OrderCardProps) {
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-foreground">{order.orderNumber}</span>
-          {order.status === 'issue' && (
+          {order.fulfillmentStage === 'issue' && (
             <AlertTriangle className="w-4 h-4 text-destructive" />
           )}
         </div>
-        <StatusBadge status={order.status} />
+        <StatusBadge status={order.fulfillmentStage} />
       </div>
 
       <div className="space-y-2">

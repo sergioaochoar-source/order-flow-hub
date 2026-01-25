@@ -18,7 +18,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { StatusBadge } from './StatusBadge';
-import { Order, FulfillmentStatus } from '@/types/order';
+import { Order, FulfillmentStage } from '@/types/order';
 import { 
   Package, 
   User, 
@@ -28,7 +28,7 @@ import {
   Truck,
   AlertTriangle
 } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -36,11 +36,11 @@ interface OrderDetailSheetProps {
   order: Order | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onStatusChange: (status: FulfillmentStatus) => void;
+  onStatusChange: (status: FulfillmentStage) => void;
   onUpdateOrder: (order: Order) => void;
 }
 
-const actionButtons: { status: FulfillmentStatus; label: string; icon: typeof CheckCircle2 }[] = [
+const actionButtons: { status: FulfillmentStage; label: string; icon: typeof CheckCircle2 }[] = [
   { status: 'pick', label: 'Mark Picked', icon: Package },
   { status: 'pack', label: 'Mark Packed', icon: Package },
   { status: 'label', label: 'Mark Labeled', icon: Package },
@@ -68,9 +68,12 @@ export function OrderDetailSheet({
 
     const updatedOrder: Order = {
       ...order,
-      status: 'shipped',
-      carrier,
-      trackingNumber,
+      fulfillmentStage: 'shipped',
+      shipment: {
+        carrier,
+        trackingNumber,
+        shippedAt: new Date().toISOString(),
+      },
       updatedAt: new Date().toISOString(),
       events: [
         ...order.events,
@@ -98,10 +101,10 @@ export function OrderDetailSheet({
   };
 
   const getNextAction = () => {
-    const statusOrder: FulfillmentStatus[] = ['new', 'qc', 'pick', 'pack', 'label'];
-    const currentIndex = statusOrder.indexOf(order.status);
-    if (currentIndex === -1 || currentIndex >= statusOrder.length - 1) return null;
-    return actionButtons.find(btn => btn.status === statusOrder[currentIndex + 1]);
+    const stageOrder: FulfillmentStage[] = ['new', 'qc', 'pick', 'pack', 'label'];
+    const currentIndex = stageOrder.indexOf(order.fulfillmentStage);
+    if (currentIndex === -1 || currentIndex >= stageOrder.length - 1) return null;
+    return actionButtons.find(btn => btn.status === stageOrder[currentIndex + 1]);
   };
 
   const nextAction = getNextAction();
@@ -112,7 +115,7 @@ export function OrderDetailSheet({
         <SheetHeader className="pb-4">
           <div className="flex items-center gap-3">
             <SheetTitle className="text-xl">{order.orderNumber}</SheetTitle>
-            <StatusBadge status={order.status} size="md" />
+            <StatusBadge status={order.fulfillmentStage} size="md" />
           </div>
           <SheetDescription className="sr-only">
             Order details for {order.orderNumber}
@@ -121,7 +124,7 @@ export function OrderDetailSheet({
 
         <div className="space-y-6">
           {/* Quick Actions */}
-          {order.status !== 'shipped' && order.status !== 'issue' && (
+          {order.fulfillmentStage !== 'shipped' && order.fulfillmentStage !== 'issue' && (
             <div className="space-y-3">
               <h4 className="font-semibold text-sm text-foreground">Quick Actions</h4>
               <div className="flex flex-wrap gap-2">
@@ -223,14 +226,14 @@ export function OrderDetailSheet({
                 <span className="font-medium">{order.shippingMethod}</span>
               </p>
 
-              {order.status === 'shipped' && order.carrier && order.trackingNumber ? (
+              {order.fulfillmentStage === 'shipped' && order.shipment ? (
                 <div className="bg-success/10 p-3 rounded-lg">
                   <p className="text-sm font-medium text-success">✓ Shipped</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {order.carrier}: {order.trackingNumber}
+                    {order.shipment.carrier}: {order.shipment.trackingNumber}
                   </p>
                 </div>
-              ) : order.status === 'label' ? (
+              ) : order.fulfillmentStage === 'label' ? (
                 <div className="space-y-3">
                   <div className="space-y-2">
                     <Label htmlFor="carrier">Carrier</Label>

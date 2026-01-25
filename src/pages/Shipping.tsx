@@ -27,11 +27,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useOrders, useAddTracking } from '@/hooks/useOrders';
+import { useAllOrders, useAddTracking } from '@/hooks/useOrders';
 import { ApiNotConfigured } from '@/components/ApiNotConfigured';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
 import { isApiConfigured } from '@/lib/api';
+import { toast } from 'sonner';
 
 const carriers = ['FedEx', 'UPS', 'DHL', 'USPS', 'Other'];
 
@@ -40,23 +41,29 @@ export default function Shipping() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [carrier, setCarrier] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
+  const [service, setService] = useState('');
 
-  const { data: orders = [], isLoading, isError, error, refetch } = useOrders();
+  const { data: orders = [], isLoading, isError, error, refetch } = useAllOrders();
   const addTrackingMutation = useAddTracking();
 
-  const readyToShip = orders.filter(o => o.status === 'label');
-  const recentlyShipped = orders.filter(o => o.status === 'shipped').slice(0, 10);
+  const readyToShip = orders.filter(o => o.fulfillmentStage === 'label');
+  const recentlyShipped = orders.filter(o => o.fulfillmentStage === 'shipped').slice(0, 10);
 
   const handleMarkShipped = () => {
     if (!selectedOrder || !carrier || !trackingNumber) {
+      toast.error('Please enter carrier and tracking number');
       return;
     }
 
     addTrackingMutation.mutate(
       { 
         orderId: selectedOrder.id, 
-        carrier, 
-        trackingNumber 
+        payload: {
+          carrier,
+          tracking: trackingNumber,
+          service: service || undefined,
+          shippedAt: new Date().toISOString(),
+        }
       },
       {
         onSuccess: () => {
@@ -64,6 +71,7 @@ export default function Shipping() {
           setSelectedOrder(null);
           setCarrier('');
           setTrackingNumber('');
+          setService('');
         }
       }
     );
@@ -170,7 +178,7 @@ export default function Shipping() {
                 <TableHead>Customer</TableHead>
                 <TableHead>Carrier</TableHead>
                 <TableHead>Tracking</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Stage</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -178,14 +186,18 @@ export default function Shipping() {
                 <TableRow key={order.id}>
                   <TableCell className="font-medium">{order.orderNumber}</TableCell>
                   <TableCell>{order.customer.name}</TableCell>
-                  <TableCell>{order.carrier}</TableCell>
+                  <TableCell>{order.shipment?.carrier || '-'}</TableCell>
                   <TableCell>
-                    <code className="text-xs bg-muted px-2 py-1 rounded">
-                      {order.trackingNumber}
-                    </code>
+                    {order.shipment?.trackingNumber ? (
+                      <code className="text-xs bg-muted px-2 py-1 rounded">
+                        {order.shipment.trackingNumber}
+                      </code>
+                    ) : (
+                      '-'
+                    )}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={order.status} />
+                    <StatusBadge status={order.fulfillmentStage} />
                   </TableCell>
                 </TableRow>
               ))}
@@ -211,7 +223,7 @@ export default function Shipping() {
 
           <div className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label htmlFor="dialog-carrier">Carrier</Label>
+              <Label htmlFor="dialog-carrier">Carrier *</Label>
               <Select value={carrier} onValueChange={setCarrier}>
                 <SelectTrigger id="dialog-carrier">
                   <SelectValue placeholder="Select carrier" />
@@ -225,12 +237,22 @@ export default function Shipping() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dialog-tracking">Tracking Number</Label>
+              <Label htmlFor="dialog-tracking">Tracking Number *</Label>
               <Input
                 id="dialog-tracking"
                 value={trackingNumber}
                 onChange={(e) => setTrackingNumber(e.target.value)}
                 placeholder="Enter tracking number"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dialog-service">Service (optional)</Label>
+              <Input
+                id="dialog-service"
+                value={service}
+                onChange={(e) => setService(e.target.value)}
+                placeholder="e.g., Ground, Express, Priority"
               />
             </div>
 

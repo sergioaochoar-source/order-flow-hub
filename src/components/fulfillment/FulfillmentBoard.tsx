@@ -1,25 +1,24 @@
-import { useMemo } from 'react';
-import { FulfillmentStatus, Order } from '@/types/order';
+import { useMemo, useState } from 'react';
+import { FulfillmentStage, Order } from '@/types/order';
 import { KanbanColumn } from './KanbanColumn';
 import { OrderDetailSheet } from './OrderDetailSheet';
-import { useOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
+import { useAllOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
 import { ApiNotConfigured } from '@/components/ApiNotConfigured';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
 import { isApiConfigured } from '@/lib/api';
-import { useState } from 'react';
 
-const statuses: FulfillmentStatus[] = ['new', 'qc', 'pick', 'pack', 'label', 'shipped', 'issue'];
+const stages: FulfillmentStage[] = ['new', 'qc', 'pick', 'pack', 'label', 'shipped', 'issue'];
 
 export function FulfillmentBoard() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   
-  const { data: orders = [], isLoading, isError, error, refetch } = useOrders();
+  const { data: orders = [], isLoading, isError, error, refetch } = useAllOrders();
   const updateStatusMutation = useUpdateOrderStatus();
 
-  const ordersByStatus = useMemo(() => {
-    const grouped: Record<FulfillmentStatus, Order[]> = {
+  const ordersByStage = useMemo(() => {
+    const grouped: Record<FulfillmentStage, Order[]> = {
       new: [],
       qc: [],
       pick: [],
@@ -30,7 +29,7 @@ export function FulfillmentBoard() {
     };
     
     orders.forEach((order) => {
-      grouped[order.status].push(order);
+      grouped[order.fulfillmentStage].push(order);
     });
     
     return grouped;
@@ -41,12 +40,12 @@ export function FulfillmentBoard() {
     setIsSheetOpen(true);
   };
 
-  const handleStatusChange = (orderId: string, newStatus: FulfillmentStatus) => {
-    updateStatusMutation.mutate({ orderId, status: newStatus });
+  const handleStageChange = (orderId: string, newStage: FulfillmentStage) => {
+    updateStatusMutation.mutate({ orderId, status: newStage });
     
     // Update selected order if it's the one being changed
     if (selectedOrder?.id === orderId) {
-      setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
+      setSelectedOrder(prev => prev ? { ...prev, fulfillmentStage: newStage } : null);
     }
   };
 
@@ -78,13 +77,13 @@ export function FulfillmentBoard() {
   return (
     <div className="h-full">
       <div className="flex gap-4 overflow-x-auto pb-4 h-full scrollbar-thin">
-        {statuses.map((status) => (
+        {stages.map((stage) => (
           <KanbanColumn
-            key={status}
-            status={status}
-            orders={ordersByStatus[status]}
+            key={stage}
+            status={stage}
+            orders={ordersByStage[stage]}
             onOrderClick={handleOrderClick}
-            onDrop={handleStatusChange}
+            onDrop={handleStageChange}
           />
         ))}
       </div>
@@ -93,9 +92,9 @@ export function FulfillmentBoard() {
         order={selectedOrder}
         open={isSheetOpen}
         onOpenChange={setIsSheetOpen}
-        onStatusChange={(status) => {
+        onStatusChange={(stage) => {
           if (selectedOrder) {
-            handleStatusChange(selectedOrder.id, status);
+            handleStageChange(selectedOrder.id, stage);
           }
         }}
         onUpdateOrder={handleUpdateOrder}
