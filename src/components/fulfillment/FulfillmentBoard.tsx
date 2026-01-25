@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
-import { FulfillmentStage, Order, TrackingPayload } from '@/types/order';
+import { FulfillmentStage, Order } from '@/types/order';
 import { KanbanColumn } from './KanbanColumn';
 import { OrderDetailSheet } from './OrderDetailSheet';
-import { ShipConfirmDialog } from './ShipConfirmDialog';
-import { useAllOrders, useUpdateOrderStatus, useAddTracking } from '@/hooks/useOrders';
+import { useAllOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
 import { ApiNotConfigured } from '@/components/ApiNotConfigured';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
@@ -17,16 +16,8 @@ export function FulfillmentBoard() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   
-  // Confirmation dialog state
-  const [showShipConfirm, setShowShipConfirm] = useState(false);
-  const [pendingShipment, setPendingShipment] = useState<{
-    order: Order;
-    payload: TrackingPayload;
-  } | null>(null);
-  
   const { data: orders = [], isLoading, isError, error, refetch } = useAllOrders();
   const updateStatusMutation = useUpdateOrderStatus();
-  const addTrackingMutation = useAddTracking();
 
   const ordersByStage = useMemo(() => {
     const grouped: Record<FulfillmentStage, Order[]> = {
@@ -72,44 +63,9 @@ export function FulfillmentBoard() {
   };
 
   const handleUpdateOrder = (updatedOrder: Order) => {
-    // If the order is being marked as shipped with tracking, show confirmation dialog
-    if (updatedOrder.fulfillmentStage === 'shipped' && updatedOrder.shipment) {
-      setPendingShipment({
-        order: updatedOrder,
-        payload: {
-          carrier: updatedOrder.shipment.carrier,
-          tracking: updatedOrder.shipment.trackingNumber,
-          service: updatedOrder.shipment.service,
-          shippedAt: updatedOrder.shipment.shippedAt,
-        },
-      });
-      setShowShipConfirm(true);
-    } else {
-      // For non-tracking updates, just update local state
-      setSelectedOrder(updatedOrder);
-    }
-  };
-
-  const handleConfirmShipment = () => {
-    if (!pendingShipment) return;
-
-    addTrackingMutation.mutate(
-      {
-        orderId: pendingShipment.order.id,
-        payload: pendingShipment.payload,
-      },
-      {
-        onSuccess: () => {
-          setShowShipConfirm(false);
-          setPendingShipment(null);
-          setIsSheetOpen(false);
-          setSelectedOrder(null);
-        },
-        onError: () => {
-          setShowShipConfirm(false);
-        },
-      }
-    );
+    // OrderDetailSheet now handles tracking mutation internally
+    // Just update local state for immediate UI feedback
+    setSelectedOrder(updatedOrder);
   };
 
   // Show configuration prompt if API not set
@@ -156,20 +112,6 @@ export function FulfillmentBoard() {
           }
         }}
         onUpdateOrder={handleUpdateOrder}
-      />
-
-      {/* Ship Confirmation Dialog */}
-      <ShipConfirmDialog
-        open={showShipConfirm}
-        onOpenChange={(open) => {
-          setShowShipConfirm(open);
-          if (!open) setPendingShipment(null);
-        }}
-        orderNumber={pendingShipment?.order.orderNumber || ''}
-        carrier={pendingShipment?.payload.carrier || ''}
-        trackingNumber={pendingShipment?.payload.tracking || ''}
-        onConfirm={handleConfirmShipment}
-        isLoading={addTrackingMutation.isPending}
       />
     </div>
   );
