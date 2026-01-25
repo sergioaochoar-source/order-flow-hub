@@ -1,0 +1,770 @@
+openapi: 3.0.3
+info:
+  title: Fulfillment Center API
+  description: |
+    API contract between Lovable Fulfillment Panel and the backend service.
+    
+    This API normalizes WooCommerce order data and provides fulfillment workflow management.
+    
+    ## Authentication
+    The API supports two authentication methods (use either or both):
+    - `X-PEPTIUM-KEY` header
+    - `Authorization: Bearer <token>` header
+    
+    ## Fulfillment Stages
+    Orders follow a strict workflow: `new` → `qc` → `pick` → `pack` → `label` → `shipped`
+    
+    The `issue` stage can be entered from any stage and resolved back to any prior stage.
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: https://api.example.com
+    description: Production (replace with actual URL)
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+tags:
+  - name: Health
+    description: API health and connectivity
+  - name: Orders
+    description: Order management and retrieval
+  - name: Fulfillment
+    description: Fulfillment stage transitions
+  - name: Tracking
+    description: Shipping and tracking management
+  - name: Webhooks
+    description: WooCommerce webhook receivers
+
+paths:
+  # ============ Health ============
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Check API health
+      description: |
+        Used by Settings page to test connection.
+        If auth is enabled, also validates the token.
+      security:
+        - {}  # Optional auth
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                  - version
+                  - time
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  time:
+                    type: string
+                    format: date-time
+                    example: "2026-01-25T10:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============ Orders ============
+  /orders:
+    get:
+      tags:
+        - Orders
+      summary: List orders with filters and pagination
+      description: |
+        Retrieve orders with optional filters for status, fulfillment stage, and search.
+        Supports pagination and sorting.
+      parameters:
+        - name: status
+          in: query
+          description: WooCommerce order status filter
+          schema:
+            type: string
+            enum: [pending, processing, on-hold, completed, cancelled, refunded, failed]
+        - name: stage
+          in: query
+          description: Fulfillment stage filter
+          schema:
+            $ref: '#/components/schemas/FulfillmentStage'
+        - name: q
+          in: query
+          description: |
+            Search query. Searches across:
+            - Order number
+            - Customer email
+            - Customer name
+            - Tracking number
+            - Product SKU
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            default: 25
+            minimum: 1
+            maximum: 100
+        - name: sort
+          in: query
+          description: Sort field and direction
+          schema:
+            type: string
+            example: "createdAt:desc"
+      responses:
+        '200':
+          description: Paginated list of orders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /orders/{id}:
+    get:
+      tags:
+        - Orders
+      summary: Get order by ID
+      description: Retrieve a single order with full details including events timeline.
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============ Fulfillment Status ============
+  /orders/{id}/status:
+    patch:
+      tags:
+        - Fulfillment
+      summary: Update fulfillment stage
+      description: |
+        Move an order to a new fulfillment stage.
+        
+        **Validation Rules:**
+        - Normal flow: `new` → `qc` → `pick` → `pack` → `label` → `shipped`
+        - Can move backward for corrections
+        - Can enter `issue` from any stage
+        - From `issue`, can move to: `new`, `qc`, `pick`, `pack`, `label`
+        - Cannot skip directly to `shipped` (requires tracking)
+        - Cannot move to `shipped` without tracking info
+        
+        Invalid transitions return 400/409 with error message.
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - stage
+              properties:
+                stage:
+                  $ref: '#/components/schemas/FulfillmentStage'
+            examples:
+              moveToQc:
+                summary: Move to QC
+                value:
+                  stage: "qc"
+              markIssue:
+                summary: Mark as Issue
+                value:
+                  stage: "issue"
+      responses:
+        '200':
+          description: Order updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Invalid transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidTransition:
+                  summary: Invalid stage transition
+                  value:
+                    message: "Invalid transition from qc to shipped"
+                    code: "INVALID_TRANSITION"
+                missingTracking:
+                  summary: Missing tracking for shipped
+                  value:
+                    message: "Cannot move to shipped without tracking information"
+                    code: "TRACKING_REQUIRED"
+        '409':
+          description: Conflict - transition not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============ Tracking ============
+  /orders/{id}/tracking:
+    post:
+      tags:
+        - Tracking
+      summary: Add tracking information and mark as shipped
+      description: |
+        Add shipping tracking information to an order.
+        
+        **Side effects:**
+        - Sets `fulfillmentStage` to `shipped`
+        - Populates `shipment` object
+        - Adds `tracking_added` and `shipped` events to timeline
+        - (Optional) Updates WooCommerce order status via `orderStatus` param
+        
+        **Backend should also:**
+        - Sync tracking to WooCommerce order meta
+        - Trigger customer notification email (optional)
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - carrier
+                - tracking
+              properties:
+                carrier:
+                  type: string
+                  description: Shipping carrier name
+                  example: "USPS"
+                tracking:
+                  type: string
+                  description: Tracking number
+                  example: "9400111899223847652345"
+                service:
+                  type: string
+                  description: Service type (optional)
+                  example: "Priority Mail"
+                shippedAt:
+                  type: string
+                  format: date-time
+                  description: Ship date/time (defaults to now if omitted)
+                  example: "2026-01-25T14:30:00Z"
+                orderStatus:
+                  type: string
+                  description: WooCommerce status to set after shipping
+                  enum: [processing, completed, on-hold]
+                  default: "completed"
+            examples:
+              basicTracking:
+                summary: Basic tracking info
+                value:
+                  carrier: "FedEx"
+                  tracking: "794644790348"
+              fullTracking:
+                summary: Full tracking with service
+                value:
+                  carrier: "USPS"
+                  tracking: "9400111899223847652345"
+                  service: "Priority Mail"
+                  shippedAt: "2026-01-25T14:30:00Z"
+                  orderStatus: "completed"
+      responses:
+        '200':
+          description: Tracking added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: "carrier and tracking are required"
+                code: "VALIDATION_ERROR"
+        '409':
+          description: Order already shipped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: "Order already has tracking information"
+                code: "ALREADY_SHIPPED"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============ WooCommerce Webhooks ============
+  /webhooks/woocommerce/order-created:
+    post:
+      tags:
+        - Webhooks
+      summary: Receive new order from WooCommerce
+      description: |
+        Webhook endpoint for WooCommerce `order.created` event.
+        
+        **Implementation notes:**
+        - Accept raw WooCommerce order payload
+        - Respond with 200 immediately (async processing)
+        - Create order in local database with `fulfillmentStage: new`
+        - Validate webhook signature via `X-WC-Webhook-Signature` header
+      security:
+        - WebhookSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Raw WooCommerce order object
+      responses:
+        '200':
+          description: Webhook acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                    example: true
+
+  /webhooks/woocommerce/order-updated:
+    post:
+      tags:
+        - Webhooks
+      summary: Receive order update from WooCommerce
+      description: |
+        Webhook endpoint for WooCommerce `order.updated` event.
+        
+        **Implementation notes:**
+        - Update existing order in database
+        - Do NOT overwrite `fulfillmentStage` (managed by panel)
+        - Sync: status, customer info, items, totals
+      security:
+        - WebhookSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Raw WooCommerce order object
+      responses:
+        '200':
+          description: Webhook acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                    example: true
+
+  /webhooks/woocommerce/order-paid:
+    post:
+      tags:
+        - Webhooks
+      summary: Receive payment confirmation from WooCommerce
+      description: |
+        Webhook endpoint for WooCommerce payment events.
+        
+        **Implementation notes:**
+        - Update order status to reflect payment
+        - May trigger order to enter fulfillment queue
+      security:
+        - WebhookSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Raw WooCommerce order/payment object
+      responses:
+        '200':
+          description: Webhook acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                    example: true
+
+components:
+  # ============ Security Schemes ============
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-PEPTIUM-KEY
+      description: API key authentication
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication
+    WebhookSignature:
+      type: apiKey
+      in: header
+      name: X-WC-Webhook-Signature
+      description: WooCommerce webhook HMAC signature
+
+  # ============ Parameters ============
+  parameters:
+    OrderId:
+      name: id
+      in: path
+      required: true
+      description: Order ID (internal database ID)
+      schema:
+        type: string
+        example: "ord_abc123"
+
+  # ============ Responses ============
+  responses:
+    Unauthorized:
+      description: Authentication required or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: "Invalid or missing authentication token"
+            code: "UNAUTHORIZED"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: "Order not found"
+            code: "NOT_FOUND"
+
+  # ============ Schemas ============
+  schemas:
+    FulfillmentStage:
+      type: string
+      enum:
+        - new
+        - qc
+        - pick
+        - pack
+        - label
+        - shipped
+        - issue
+      description: |
+        Internal fulfillment stage (not WooCommerce status).
+        - `new`: Order received, awaiting processing
+        - `qc`: Quality control check
+        - `pick`: Items being picked from inventory
+        - `pack`: Order being packed
+        - `label`: Shipping label created
+        - `shipped`: Order dispatched with tracking
+        - `issue`: Problem flagged, requires resolution
+
+    Order:
+      type: object
+      required:
+        - id
+        - orderNumber
+        - status
+        - fulfillmentStage
+        - createdAt
+        - total
+        - customer
+        - shippingAddress
+        - items
+      properties:
+        id:
+          type: string
+          description: Internal database ID
+          example: "ord_abc123"
+        orderNumber:
+          type: string
+          description: Display order number
+          example: "#1234"
+        wcOrderId:
+          type: string
+          description: WooCommerce order ID (optional)
+          example: "1234"
+        status:
+          type: string
+          description: WooCommerce order status
+          enum: [pending, processing, on-hold, completed, cancelled, refunded, failed]
+          example: "processing"
+        fulfillmentStage:
+          $ref: '#/components/schemas/FulfillmentStage'
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-01-20T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-01-25T14:30:00Z"
+        total:
+          type: number
+          format: float
+          example: 125.99
+        currency:
+          type: string
+          default: "USD"
+          example: "USD"
+        shippingMethod:
+          type: string
+          example: "Standard Shipping"
+        notes:
+          type: string
+          description: Internal notes
+          example: "Customer requested gift wrap"
+        customer:
+          $ref: '#/components/schemas/Customer'
+        shippingAddress:
+          $ref: '#/components/schemas/Address'
+        billingAddress:
+          $ref: '#/components/schemas/Address'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        shipment:
+          $ref: '#/components/schemas/Shipment'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderEvent'
+          description: Timeline of order events
+
+    Customer:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        id:
+          type: string
+          example: "cust_xyz789"
+        name:
+          type: string
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        phone:
+          type: string
+          example: "+1 555-123-4567"
+
+    Address:
+      type: object
+      required:
+        - line1
+        - city
+        - state
+        - postalCode
+        - country
+      properties:
+        line1:
+          type: string
+          example: "123 Main Street"
+        line2:
+          type: string
+          example: "Apt 4B"
+        city:
+          type: string
+          example: "New York"
+        state:
+          type: string
+          example: "NY"
+        postalCode:
+          type: string
+          example: "10001"
+        country:
+          type: string
+          example: "US"
+
+    OrderItem:
+      type: object
+      required:
+        - id
+        - sku
+        - name
+        - quantity
+      properties:
+        id:
+          type: string
+          example: "item_001"
+        sku:
+          type: string
+          example: "WIDGET-BLU-LG"
+        name:
+          type: string
+          example: "Blue Widget (Large)"
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+        price:
+          type: number
+          format: float
+          example: 29.99
+        imageUrl:
+          type: string
+          format: uri
+          example: "https://example.com/images/widget-blue.jpg"
+
+    Shipment:
+      type: object
+      required:
+        - carrier
+        - trackingNumber
+      properties:
+        carrier:
+          type: string
+          example: "FedEx"
+        trackingNumber:
+          type: string
+          example: "794644790348"
+        service:
+          type: string
+          example: "Ground"
+        shippedAt:
+          type: string
+          format: date-time
+          example: "2026-01-25T14:30:00Z"
+        trackingUrl:
+          type: string
+          format: uri
+          description: Pre-built tracking URL (optional)
+          example: "https://www.fedex.com/fedextrack/?trknbr=794644790348"
+
+    OrderEvent:
+      type: object
+      required:
+        - id
+        - type
+        - timestamp
+        - description
+      properties:
+        id:
+          type: string
+          example: "evt_001"
+        type:
+          type: string
+          enum:
+            - order_created
+            - status_change
+            - stage_change
+            - tracking_added
+            - note_added
+            - issue_flagged
+            - issue_resolved
+          example: "tracking_added"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-01-25T14:30:00Z"
+        description:
+          type: string
+          example: "Tracking added: FedEx - 794644790348"
+        user:
+          type: string
+          description: User who triggered the event
+          example: "operator@example.com"
+        meta:
+          type: object
+          description: Additional event-specific data
+          additionalProperties: true
+
+    PaginatedOrderResponse:
+      type: object
+      required:
+        - data
+        - page
+        - limit
+        - total
+        - totalPages
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 25
+        total:
+          type: integer
+          description: Total number of orders matching filters
+          example: 123
+        totalPages:
+          type: integer
+          example: 5
+
+    Error:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Invalid transition from qc to shipped"
+        code:
+          type: string
+          description: Machine-readable error code
+          example: "INVALID_TRANSITION"
+        detail:
+          type: string
+          description: Additional error details
+        errors:
+          type: array
+          items:
+            type: string
+          description: List of validation errors
