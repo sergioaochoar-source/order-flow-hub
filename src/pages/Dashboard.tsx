@@ -5,11 +5,12 @@ import {
   Truck, 
   TrendingUp,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Download
 } from 'lucide-react';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { StatusBadge } from '@/components/fulfillment/StatusBadge';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAllOrders } from '@/hooks/useOrders';
@@ -17,18 +18,36 @@ import { useDashboardMetrics } from '@/hooks/useMetrics';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
 import { EmptyOrdersState } from '@/components/EmptyOrdersState';
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
+import { Order } from '@/types/order';
 
 export default function Dashboard() {
   const { data: orders = [], isLoading: ordersLoading, isError: ordersError, error: ordersErrorData, refetch: refetchOrders } = useAllOrders();
   const { data: metrics, isLoading: metricsLoading } = useDashboardMetrics();
 
-  // Calculate metrics from PAID orders only
+  // Get date ranges
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(startOfToday);
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // Filter paid orders for this week
+  const weeklyPaidOrders = useMemo(() => {
+    return orders.filter(o => o.paidAt && new Date(o.paidAt) >= startOfWeek);
+  }, [orders, startOfWeek]);
+
+  // Filter paid orders for this month
+  const monthlyPaidOrders = useMemo(() => {
+    return orders.filter(o => o.paidAt && new Date(o.paidAt) >= startOfMonth);
+  }, [orders, startOfMonth]);
+
+  // Calculate metrics from PAID orders only (weekly view)
   const calculatedMetrics = useMemo(() => {
     if (metrics) return metrics;
     
-    // Filter to only paid orders (orders with paid_at date)
-    const paidOrders = orders.filter(o => o.paidAt);
+    // Use weekly paid orders for main dashboard metrics
+    const paidOrders = weeklyPaidOrders;
     
     const pendingOrders = paidOrders.filter(o => !['shipped', 'issue'].includes(o.fulfillmentStage)).length;
     const issueOrders = paidOrders.filter(o => o.fulfillmentStage === 'issue').length;
@@ -36,24 +55,13 @@ export default function Dashboard() {
     const totalOrders = paidOrders.length;
     const totalSales = paidOrders.reduce((sum, o) => sum + o.total, 0);
     
-    // Calculate time-based sales from paid orders
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfWeek = new Date(startOfToday);
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
-    const todaySales = paidOrders
+    const todaySales = orders
       .filter(o => o.paidAt && new Date(o.paidAt) >= startOfToday)
       .reduce((sum, o) => sum + o.total, 0);
     
-    const weekSales = paidOrders
-      .filter(o => o.paidAt && new Date(o.paidAt) >= startOfWeek)
-      .reduce((sum, o) => sum + o.total, 0);
+    const weekSales = totalSales;
     
-    const monthSales = paidOrders
-      .filter(o => o.paidAt && new Date(o.paidAt) >= startOfMonth)
-      .reduce((sum, o) => sum + o.total, 0);
+    const monthSales = monthlyPaidOrders.reduce((sum, o) => sum + o.total, 0);
     
     return {
       todaySales,
@@ -65,10 +73,62 @@ export default function Dashboard() {
       totalOrders,
       averageTicket: totalOrders > 0 ? totalSales / totalOrders : 0
     };
-  }, [orders, metrics]);
+  }, [orders, metrics, weeklyPaidOrders, monthlyPaidOrders, startOfToday]);
 
-  const recentOrders = orders.slice(0, 5);
-  const issueOrders = orders.filter(o => o.fulfillmentStage === 'issue').slice(0, 3);
+  // CSV Export function
+  const exportOrdersToCSV = useCallback((ordersToExport: Order[], filename: string) => {
+    if (ordersToExport.length === 0) {
+      alert('No hay órdenes para exportar en este período.');
+      return;
+    }
+
+    const headers = [
+      'Número de Orden',
+      'Fecha de Pago',
+      'Cliente',
+      'Email',
+      'Total',
+      'Moneda',
+      'Estado',
+      'Etapa Fulfillment',
+      'Dirección de Envío'
+    ];
+
+    const rows = ordersToExport.map(order => [
+      order.orderNumber,
+      order.paidAt ? format(new Date(order.paidAt), 'yyyy-MM-dd HH:mm') : '',
+      order.customer.name || '',
+      order.customer.email || '',
+      order.total.toFixed(2),
+      order.currency || 'USD',
+      order.status,
+      order.fulfillmentStage,
+      order.shippingAddress ? `${order.shippingAddress.line1 || ''}, ${order.shippingAddress.city || ''}, ${order.shippingAddress.country || ''}` : ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${filename}_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }, []);
+
+  const handleDownloadWeekly = useCallback(() => {
+    exportOrdersToCSV(weeklyPaidOrders, 'ordenes_semana');
+  }, [weeklyPaidOrders, exportOrdersToCSV]);
+
+  const handleDownloadMonthly = useCallback(() => {
+    exportOrdersToCSV(monthlyPaidOrders, 'ordenes_mes');
+  }, [monthlyPaidOrders, exportOrdersToCSV]);
+
+  const recentOrders = weeklyPaidOrders.slice(0, 5);
+  const issueOrders = weeklyPaidOrders.filter(o => o.fulfillmentStage === 'issue').slice(0, 3);
 
   // Loading state
   if (ordersLoading || metricsLoading) {
@@ -106,17 +166,29 @@ export default function Dashboard() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">Overview of your fulfillment operations</p>
+          <p className="text-muted-foreground">
+            Resumen semanal ({format(startOfWeek, 'dd MMM')} - {format(now, 'dd MMM yyyy')})
+          </p>
         </div>
-        <Link to="/fulfillment">
-          <Button className="gap-2">
-            <Package className="w-4 h-4" />
-            Go to Fulfillment Board
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadWeekly}>
+            <Download className="w-4 h-4" />
+            Descargar Semana ({weeklyPaidOrders.length})
           </Button>
-        </Link>
+          <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadMonthly}>
+            <Download className="w-4 h-4" />
+            Descargar Mes ({monthlyPaidOrders.length})
+          </Button>
+          <Link to="/fulfillment">
+            <Button className="gap-2">
+              <Package className="w-4 h-4" />
+              Fulfillment Board
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Metrics Grid */}
