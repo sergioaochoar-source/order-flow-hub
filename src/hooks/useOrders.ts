@@ -7,6 +7,7 @@ import {
   updateOrderNotes,
   isCloudApiConfigured 
 } from '@/lib/cloudApi';
+import { sendStatusUpdate } from '@/lib/emailApi';
 import { Order, FulfillmentStage, OrderFilters, PaginatedResponse, TrackingPayload } from '@/types/order';
 import { toast } from 'sonner';
 
@@ -53,12 +54,17 @@ export function useOrder(id: string) {
 }
 
 // ============ Update Order Status (Optimistic) ============
+// Stages that should trigger customer email notifications
+const EMAIL_NOTIFICATION_STAGES: FulfillmentStage[] = ['qc', 'pick', 'pack', 'label'];
+
 export function useUpdateOrderStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ orderId, status }: { orderId: string; status: FulfillmentStage }) =>
-      updateOrderStatus(orderId, status),
+    mutationFn: async ({ orderId, status, order }: { orderId: string; status: FulfillmentStage; order?: Order }) => {
+      const result = await updateOrderStatus(orderId, status);
+      return { result, order, newStatus: status };
+    },
     
     onMutate: async ({ orderId, status }) => {
       // Cancel outgoing refetches
@@ -70,9 +76,19 @@ export function useUpdateOrderStatus() {
       
       const previousData: Record<string, unknown> = {};
       
+      // Find the order data before update for email sending
+      let orderData: Order | undefined;
+      
       listQueries.forEach((query) => {
         const key = JSON.stringify(query.queryKey);
         previousData[key] = query.state.data;
+        
+        // Try to find the order in this query's data
+        const data = query.state.data as PaginatedResponse<Order> | Order[] | undefined;
+        if (data && !orderData) {
+          const orders = Array.isArray(data) ? data : data.data;
+          orderData = orders?.find(o => o.id === orderId);
+        }
         
         // Optimistically update each list query
         queryClient.setQueryData<PaginatedResponse<Order> | Order[]>(
@@ -101,7 +117,7 @@ export function useUpdateOrderStatus() {
         );
       });
 
-      return { previousData, listQueries };
+      return { previousData, listQueries, orderData };
     },
     
     onError: (err, variables, context) => {
@@ -123,8 +139,26 @@ export function useUpdateOrderStatus() {
       });
     },
     
-    onSuccess: (data, { status }) => {
+    onSuccess: async (data, { status }, context) => {
       toast.success(`Order moved to ${status.toUpperCase()}`);
+      
+      // Send email notification for specific stages (not 'new', 'shipped', or 'issue')
+      // 'shipped' is handled separately when tracking is added
+      const order = context?.orderData;
+      if (order && EMAIL_NOTIFICATION_STAGES.includes(status) && order.customer?.email) {
+        try {
+          await sendStatusUpdate({
+            to: order.customer.email,
+            orderNumber: order.orderNumber,
+            customerName: order.customer.name,
+            newStatus: status,
+          });
+          console.log(`[Email] Status update sent for order #${order.orderNumber} -> ${status}`);
+        } catch (emailError) {
+          // Don't show error to user - email is secondary
+          console.error('[Email] Failed to send status update:', emailError);
+        }
+      }
     },
     
     onSettled: () => {
