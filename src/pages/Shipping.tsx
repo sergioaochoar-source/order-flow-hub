@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StatusBadge } from '@/components/fulfillment/StatusBadge';
 import { Order } from '@/types/order';
-import { Truck, Package, CheckCircle2 } from 'lucide-react';
+import { Truck, Package, CheckCircle2, Tag, ExternalLink } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -31,13 +31,16 @@ import { useAllOrders, useAddTracking } from '@/hooks/useOrders';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
 import { EmptyOrdersState } from '@/components/EmptyOrdersState';
+import { ShippingRatesDialog } from '@/components/shipping/ShippingRatesDialog';
+import { getWarehouseAddress } from '@/pages/Settings';
 import { toast } from 'sonner';
 
-const carriers = ['FedEx', 'UPS', 'DHL', 'USPS', 'Other'];
+const carriers = ['FedEx', 'UPS', 'DHL', 'USPS', 'Estafeta', 'RedPack', 'Other'];
 
 export default function Shipping() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isRatesDialogOpen, setIsRatesDialogOpen] = useState(false);
   const [carrier, setCarrier] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
   const [service, setService] = useState('');
@@ -47,6 +50,32 @@ export default function Shipping() {
 
   const readyToShip = orders.filter(o => o.fulfillmentStage === 'label');
   const recentlyShipped = orders.filter(o => o.fulfillmentStage === 'shipped').slice(0, 10);
+
+  // Handle label purchased from Shippo
+  const handleLabelPurchased = async (trackingNum: string, carrierName: string, labelUrl: string) => {
+    if (!selectedOrder) return;
+
+    // Auto-fill the tracking form and submit
+    addTrackingMutation.mutate(
+      { 
+        orderId: selectedOrder.id, 
+        payload: {
+          carrier: carrierName,
+          tracking: trackingNum,
+          shippedAt: new Date().toISOString(),
+        }
+      },
+      {
+        onSuccess: () => {
+          toast.success(`Order ${selectedOrder.orderNumber} marked as shipped!`);
+          setIsRatesDialogOpen(false);
+          setSelectedOrder(null);
+          // Open label in new tab
+          window.open(labelUrl, '_blank');
+        }
+      }
+    );
+  };
 
   const handleMarkShipped = () => {
     if (!selectedOrder || !carrier || !trackingNumber) {
@@ -151,15 +180,30 @@ export default function Shipping() {
                   <TableCell>{order.shippingMethod}</TableCell>
                   <TableCell>{order.items.length}</TableCell>
                   <TableCell>
-                    <Button 
-                      size="sm"
-                      onClick={() => {
-                        setSelectedOrder(order);
-                        setIsDialogOpen(true);
-                      }}
-                    >
-                      Add Tracking
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm"
+                        variant="default"
+                        className="gap-1"
+                        onClick={() => {
+                          setSelectedOrder(order);
+                          setIsRatesDialogOpen(true);
+                        }}
+                      >
+                        <Tag className="w-3 h-3" />
+                        Buy Label
+                      </Button>
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedOrder(order);
+                          setIsDialogOpen(true);
+                        }}
+                      >
+                        Manual
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -286,6 +330,15 @@ export default function Shipping() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Shippo Rates Dialog */}
+      <ShippingRatesDialog
+        order={selectedOrder}
+        open={isRatesDialogOpen}
+        onOpenChange={setIsRatesDialogOpen}
+        onLabelPurchased={handleLabelPurchased}
+        warehouseAddress={getWarehouseAddress()}
+      />
     </div>
   );
 }
