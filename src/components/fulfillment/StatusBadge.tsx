@@ -14,7 +14,8 @@ const statusConfig: Record<FulfillmentStage, { label: string; className: string 
 };
 
 export function StatusBadge({ status, size = 'sm' }: StatusBadgeProps) {
-  const config = statusConfig[status];
+  // Fallback for legacy stages (qc, pick, pack)
+  const config = statusConfig[status] || statusConfig.label;
   
   return (
     <span className={cn(
