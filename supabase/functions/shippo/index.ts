@@ -171,6 +171,46 @@ serve(async (req) => {
       });
     }
 
+    // GET /label-pdf?url=... - Proxy download label PDF to avoid browser blocking
+    if (req.method === 'GET' && path === '/label-pdf') {
+      const labelUrl = url.searchParams.get('url');
+      
+      if (!labelUrl) {
+        return new Response(
+          JSON.stringify({ error: 'url parameter is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Validate URL is from Shippo
+      if (!labelUrl.includes('goshippo.com')) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid label URL' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Fetch the PDF from Shippo
+      const pdfResponse = await fetch(labelUrl);
+      
+      if (!pdfResponse.ok) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch label PDF' }),
+          { status: pdfResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const pdfBuffer = await pdfResponse.arrayBuffer();
+      
+      return new Response(pdfBuffer, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': 'attachment; filename="shipping-label.pdf"',
+        },
+      });
+    }
+
     return new Response(
       JSON.stringify({ error: 'Not found', path }),
       { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
