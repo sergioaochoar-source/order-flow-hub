@@ -162,6 +162,103 @@ function getStatusUpdateEmail(orderNumber: string, customerName: string, newStat
   };
 }
 
+// Thank you for your order email (sent on payment)
+function getThankYouEmail(orderNumber: string, customerName: string, total: string, currency: string) {
+  return {
+    subject: `🎉 Thank you for your order #${orderNumber}!`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
+        ${getEmailHeader("Thank you for your order! 🎉")}
+        
+        <div style="background: white; padding: 30px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
+          <p style="font-size: 16px; margin-top: 0;">Hi <strong>${customerName || 'there'}</strong>,</p>
+          
+          <p>Thank you for your purchase! We're thrilled to have you as a customer.</p>
+          
+          <div style="background: #fafafa; border: 1px solid #e5e7eb; border-left: 4px solid ${BRAND_ORANGE}; border-radius: 0 8px 8px 0; padding: 20px; margin: 25px 0;">
+            <h3 style="margin: 0 0 15px 0; color: ${BRAND_DARK}; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Order Details</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Order Number:</td>
+                <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_ORANGE};">${orderNumber}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; color: #6b7280; font-size: 14px; border-top: 1px solid #eee;">Total:</td>
+                <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_DARK}; border-top: 1px solid #eee;">${currency} ${total}</td>
+              </tr>
+            </table>
+          </div>
+          
+          <p>Your order has been received and is now being processed. We'll send you another email with tracking information once your order ships.</p>
+          
+          <p style="color: #6b7280; font-size: 14px; margin-top: 25px;">If you have any questions, feel free to contact us anytime.</p>
+          
+          <p style="margin-top: 30px; margin-bottom: 0;">We appreciate your business!</p>
+          <p style="color: ${BRAND_ORANGE}; font-weight: 600; margin-top: 5px;">The Peptium Lab Team</p>
+        </div>
+        
+        ${getEmailFooter()}
+      </body>
+      </html>
+    `,
+  };
+}
+
+// Follow-up review request email (sent 2 weeks after payment)
+function getFollowUpReviewEmail(orderNumber: string, customerName: string, trustpilotUrl: string) {
+  const reviewUrl = trustpilotUrl || "https://www.trustpilot.com/review/peptiumlab.com";
+  
+  return {
+    subject: `⭐ How was your experience with order #${orderNumber}?`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
+        ${getEmailHeader("We'd love your feedback! ⭐")}
+        
+        <div style="background: white; padding: 30px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
+          <p style="font-size: 16px; margin-top: 0;">Hi <strong>${customerName || 'there'}</strong>,</p>
+          
+          <p>It's been a couple of weeks since you received your order <strong style="color: ${BRAND_ORANGE};">${orderNumber}</strong>, and we hope you're enjoying it!</p>
+          
+          <p>We'd really appreciate it if you could take a moment to share your experience. Your feedback helps us improve and helps other customers make informed decisions.</p>
+          
+          <div style="text-align: center; margin: 35px 0;">
+            <a href="${reviewUrl}" style="display: inline-block; background: ${BRAND_ORANGE}; color: white; text-decoration: none; padding: 16px 40px; border-radius: 6px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(232, 93, 28, 0.3);">
+              ⭐ Leave a Review on Trustpilot
+            </a>
+          </div>
+          
+          <p style="color: #6b7280; font-size: 14px; text-align: center;">It only takes a minute and means the world to us!</p>
+          
+          <div style="background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 25px 0; text-align: center;">
+            <p style="margin: 0; color: #6b7280; font-size: 14px;">Having issues with your order?</p>
+            <p style="margin: 10px 0 0 0;">
+              <a href="mailto:support@peptiumlab.com" style="color: ${BRAND_ORANGE}; text-decoration: none; font-weight: 600;">Contact our support team →</a>
+            </p>
+          </div>
+          
+          <p style="margin-top: 30px; margin-bottom: 0;">Thank you for being a valued customer!</p>
+          <p style="color: ${BRAND_ORANGE}; font-weight: 600; margin-top: 5px;">The Peptium Lab Team</p>
+        </div>
+        
+        ${getEmailFooter()}
+      </body>
+      </html>
+    `,
+  };
+}
+
 function getStatusColor(status: string): string {
   const colors: Record<string, string> = {
     'new': '#3b82f6',
@@ -269,6 +366,54 @@ app.post("/status-update", async (c) => {
     return c.json({ success: true, id: result.id }, 200, corsHeaders);
   } catch (error: unknown) {
     console.error("[Email] Error sending status update:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: message }, 500, corsHeaders);
+  }
+});
+
+// Send thank you email (on payment)
+app.post("/thank-you", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { to, orderNumber, customerName, total, currency } = body;
+
+    if (!to || !orderNumber) {
+      return c.json({ error: "Missing required fields: to, orderNumber" }, 400, corsHeaders);
+    }
+
+    const emailContent = getThankYouEmail(orderNumber, customerName, total || "0.00", currency || "USD");
+
+    const result = await sendEmail(to, emailContent.subject, emailContent.html);
+
+    console.log(`[Email] Thank you email sent to ${to} for order #${orderNumber}`, result);
+
+    return c.json({ success: true, id: result.id }, 200, corsHeaders);
+  } catch (error: unknown) {
+    console.error("[Email] Error sending thank you email:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: message }, 500, corsHeaders);
+  }
+});
+
+// Send follow-up review request email (2 weeks after payment)
+app.post("/follow-up-review", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { to, orderNumber, customerName, trustpilotUrl } = body;
+
+    if (!to || !orderNumber) {
+      return c.json({ error: "Missing required fields: to, orderNumber" }, 400, corsHeaders);
+    }
+
+    const emailContent = getFollowUpReviewEmail(orderNumber, customerName, trustpilotUrl);
+
+    const result = await sendEmail(to, emailContent.subject, emailContent.html);
+
+    console.log(`[Email] Follow-up review email sent to ${to} for order #${orderNumber}`, result);
+
+    return c.json({ success: true, id: result.id }, 200, corsHeaders);
+  } catch (error: unknown) {
+    console.error("[Email] Error sending follow-up review email:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return c.json({ error: message }, 500, corsHeaders);
   }

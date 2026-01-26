@@ -613,6 +613,33 @@ Deno.serve(async (req) => {
         meta: { topic, wc_order_id: wcOrderId, status: wcOrder.status },
       });
 
+      // Send thank you email for new orders with payment
+      const isNewOrder = !existingOrder;
+      const isPaid = topic === "order.paid" || wcOrder.date_paid;
+      
+      if (isNewOrder && isPaid && customerEmail) {
+        try {
+          const emailUrl = `${supabaseUrl}/functions/v1/send-email/thank-you`;
+          await fetch(emailUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${supabaseKey}`,
+            },
+            body: JSON.stringify({
+              to: customerEmail,
+              orderNumber: orderNumber,
+              customerName: customerName,
+              total: String(parseFloat(wcOrder.total) || 0),
+              currency: wcOrder.currency || "USD",
+            }),
+          });
+          console.log(`[WooCommerce Webhook] Thank you email sent to ${customerEmail}`);
+        } catch (emailError) {
+          console.error("[WooCommerce Webhook] Failed to send thank you email:", emailError);
+        }
+      }
+
       console.log(`[WooCommerce Webhook] Processed order ${orderId} (WC: ${wcOrderId})`);
 
       return new Response(JSON.stringify({ ok: true }), {
