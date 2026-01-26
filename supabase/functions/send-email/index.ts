@@ -12,6 +12,10 @@ const RESEND_API_URL = "https://api.resend.com/emails";
 
 const FROM_EMAIL = "Peptium Lab <noreply@peptiumlab.com>";
 
+// Brand colors
+const BRAND_ORANGE = "#E85D1C";
+const BRAND_DARK = "#1a1a1a";
+
 async function sendEmail(to: string, subject: string, html: string) {
   const response = await fetch(RESEND_API_URL, {
     method: "POST",
@@ -35,17 +39,15 @@ async function sendEmail(to: string, subject: string, html: string) {
   return response.json();
 }
 
-// Brand colors
-const BRAND_ORANGE = "#E85D1C";
-const BRAND_DARK = "#1a1a1a";
-const LOGO_URL = "https://id-preview--bb0f3b78-b0d6-40e6-b73c-397601de4ee9.lovable.app/images/peptium-logo.png";
-
-// Email header with logo
+// Email header with brand logo (text-based for reliability)
 function getEmailHeader(title: string) {
   return `
     <div style="background: ${BRAND_DARK}; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-      <img src="${LOGO_URL}" alt="Peptium Lab" style="height: 50px; margin-bottom: 15px;" />
-      <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 500;">${title}</h1>
+      <div style="margin-bottom: 15px;">
+        <span style="font-size: 28px; font-weight: 700; color: ${BRAND_ORANGE};">PEPTIUM</span>
+        <span style="font-size: 28px; font-weight: 300; color: white;"> LAB</span>
+      </div>
+      <h1 style="color: white; margin: 0; font-size: 20px; font-weight: 400;">${title}</h1>
     </div>
   `;
 }
@@ -54,7 +56,7 @@ function getEmailHeader(title: string) {
 function getEmailFooter() {
   return `
     <div style="background: ${BRAND_DARK}; padding: 25px; border-radius: 0 0 10px 10px; text-align: center;">
-      <p style="color: #888; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} Peptium Lab. Todos los derechos reservados.</p>
+      <p style="color: #888; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} Peptium Lab. All rights reserved.</p>
       <p style="color: #666; font-size: 11px; margin: 10px 0 0 0;">
         <a href="https://peptiumlab.com" style="color: ${BRAND_ORANGE}; text-decoration: none;">peptiumlab.com</a>
       </p>
@@ -62,12 +64,12 @@ function getEmailFooter() {
   `;
 }
 
-// Shipping confirmation email template
+// Shipping confirmation email template (English)
 function getShippingConfirmationEmail(orderNumber: string, customerName: string, carrier: string, trackingNumber: string, trackingUrl?: string) {
   const trackingLink = trackingUrl || getTrackingUrl(carrier, trackingNumber);
   
   return {
-    subject: `📦 Tu pedido #${orderNumber} ha sido enviado`,
+    subject: `📦 Your order #${orderNumber} has been shipped`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -76,22 +78,22 @@ function getShippingConfirmationEmail(orderNumber: string, customerName: string,
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
-        ${getEmailHeader("¡Tu pedido está en camino! 📦")}
+        ${getEmailHeader("Your order is on its way! 📦")}
         
         <div style="background: white; padding: 30px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
-          <p style="font-size: 16px; margin-top: 0;">Hola <strong>${customerName || 'Cliente'}</strong>,</p>
+          <p style="font-size: 16px; margin-top: 0;">Hi <strong>${customerName || 'there'}</strong>,</p>
           
-          <p>Nos complace informarte que tu pedido <strong style="color: ${BRAND_ORANGE};">#${orderNumber}</strong> ha sido enviado.</p>
+          <p>Great news! Your order <strong style="color: ${BRAND_ORANGE};">#${orderNumber}</strong> has been shipped.</p>
           
           <div style="background: #fafafa; border: 1px solid #e5e7eb; border-left: 4px solid ${BRAND_ORANGE}; border-radius: 0 8px 8px 0; padding: 20px; margin: 25px 0;">
-            <h3 style="margin: 0 0 15px 0; color: ${BRAND_DARK}; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Información del envío</h3>
+            <h3 style="margin: 0 0 15px 0; color: ${BRAND_DARK}; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Shipping Information</h3>
             <table style="width: 100%; border-collapse: collapse;">
               <tr>
-                <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Transportista:</td>
+                <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Carrier:</td>
                 <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_DARK};">${carrier}</td>
               </tr>
               <tr>
-                <td style="padding: 10px 0; color: #6b7280; font-size: 14px; border-top: 1px solid #eee;">Número de rastreo:</td>
+                <td style="padding: 10px 0; color: #6b7280; font-size: 14px; border-top: 1px solid #eee;">Tracking Number:</td>
                 <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_DARK}; border-top: 1px solid #eee; font-family: monospace;">${trackingNumber}</td>
               </tr>
             </table>
@@ -100,15 +102,15 @@ function getShippingConfirmationEmail(orderNumber: string, customerName: string,
           ${trackingLink ? `
           <div style="text-align: center; margin: 30px 0;">
             <a href="${trackingLink}" style="display: inline-block; background: ${BRAND_ORANGE}; color: white; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 12px rgba(232, 93, 28, 0.3);">
-              Rastrear mi pedido →
+              Track My Order →
             </a>
           </div>
           ` : ''}
           
-          <p style="color: #6b7280; font-size: 14px; margin-top: 25px;">Si tienes alguna pregunta sobre tu pedido, no dudes en contactarnos.</p>
+          <p style="color: #6b7280; font-size: 14px; margin-top: 25px;">If you have any questions about your order, feel free to contact us.</p>
           
-          <p style="margin-top: 30px; margin-bottom: 0;">¡Gracias por tu compra!</p>
-          <p style="color: ${BRAND_ORANGE}; font-weight: 600; margin-top: 5px;">El equipo de Peptium Lab</p>
+          <p style="margin-top: 30px; margin-bottom: 0;">Thank you for your purchase!</p>
+          <p style="color: ${BRAND_ORANGE}; font-weight: 600; margin-top: 5px;">The Peptium Lab Team</p>
         </div>
         
         ${getEmailFooter()}
@@ -118,14 +120,14 @@ function getShippingConfirmationEmail(orderNumber: string, customerName: string,
   };
 }
 
-// Status update email template
+// Status update email template (English)
 function getStatusUpdateEmail(orderNumber: string, customerName: string, newStatus: string, statusMessage: string) {
   const statusEmoji = getStatusEmoji(newStatus);
   const statusLabel = getStatusLabel(newStatus);
   const statusColor = getStatusColor(newStatus);
   
   return {
-    subject: `${statusEmoji} Actualización de tu pedido #${orderNumber}`,
+    subject: `${statusEmoji} Order #${orderNumber} Update`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -134,25 +136,25 @@ function getStatusUpdateEmail(orderNumber: string, customerName: string, newStat
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
-        ${getEmailHeader(`Actualización de pedido ${statusEmoji}`)}
+        ${getEmailHeader(`Order Update ${statusEmoji}`)}
         
         <div style="background: white; padding: 30px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
-          <p style="font-size: 16px; margin-top: 0;">Hola <strong>${customerName || 'Cliente'}</strong>,</p>
+          <p style="font-size: 16px; margin-top: 0;">Hi <strong>${customerName || 'there'}</strong>,</p>
           
-          <p>Tu pedido <strong style="color: ${BRAND_ORANGE};">#${orderNumber}</strong> ha sido actualizado.</p>
+          <p>Your order <strong style="color: ${BRAND_ORANGE};">#${orderNumber}</strong> has been updated.</p>
           
           <div style="background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 25px; margin: 25px 0; text-align: center;">
-            <p style="font-size: 12px; color: #6b7280; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px;">Estado actual</p>
+            <p style="font-size: 12px; color: #6b7280; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px;">Current Status</p>
             <div style="display: inline-block; background: ${statusColor}; color: white; padding: 10px 24px; border-radius: 50px; font-size: 16px; font-weight: 600;">
               ${statusEmoji} ${statusLabel}
             </div>
             ${statusMessage ? `<p style="color: #6b7280; margin: 20px 0 0 0; font-size: 14px;">${statusMessage}</p>` : ''}
           </div>
           
-          <p style="color: #6b7280; font-size: 14px; margin-top: 25px;">Si tienes alguna pregunta sobre tu pedido, no dudes en contactarnos.</p>
+          <p style="color: #6b7280; font-size: 14px; margin-top: 25px;">If you have any questions about your order, feel free to contact us.</p>
           
-          <p style="margin-top: 30px; margin-bottom: 0;">¡Gracias por tu compra!</p>
-          <p style="color: ${BRAND_ORANGE}; font-weight: 600; margin-top: 5px;">El equipo de Peptium Lab</p>
+          <p style="margin-top: 30px; margin-bottom: 0;">Thank you for your purchase!</p>
+          <p style="color: ${BRAND_ORANGE}; font-weight: 600; margin-top: 5px;">The Peptium Lab Team</p>
         </div>
         
         ${getEmailFooter()}
@@ -210,13 +212,13 @@ function getStatusEmoji(status: string): string {
 
 function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
-    'new': 'Nuevo',
-    'qc': 'Control de Calidad',
-    'pick': 'En Preparación',
-    'pack': 'Empacando',
-    'label': 'Etiquetado',
-    'shipped': 'Enviado',
-    'issue': 'Requiere Atención',
+    'new': 'New Order',
+    'qc': 'Quality Control',
+    'pick': 'Picking',
+    'pack': 'Packing',
+    'label': 'Ready to Ship',
+    'shipped': 'Shipped',
+    'issue': 'Needs Attention',
   };
   return labels[status.toLowerCase()] || status;
 }
