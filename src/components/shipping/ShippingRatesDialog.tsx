@@ -183,7 +183,16 @@ export function ShippingRatesDialog({
       onLabelPurchased(result.trackingNumber, result.carrier, result.labelUrl);
     } catch (err) {
       console.error('Failed to purchase label:', err);
-      setError(err instanceof Error ? err.message : 'Failed to purchase label');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to purchase label';
+      
+      // Check for carrier registration errors
+      if (errorMessage.includes('registration') || errorMessage.includes('not yet registered')) {
+        setError('This carrier is not fully activated in your Shippo account. Please try USPS or another carrier, or activate this carrier at apps.goshippo.com');
+        // Deselect the problematic rate
+        setSelectedRate(null);
+      } else {
+        setError(errorMessage);
+      }
       toast.error('Failed to purchase label');
     } finally {
       setIsPurchasing(false);
