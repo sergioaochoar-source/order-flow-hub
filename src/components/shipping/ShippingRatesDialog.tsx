@@ -63,6 +63,16 @@ interface ShippoRate {
   duration_terms: string;
 }
 
+// Parcel presets for quick selection
+const PARCEL_PRESETS = [
+  { name: 'Small Box', icon: '📦', length: 6, width: 4, height: 3, weight: 0.5 },
+  { name: 'Medium Box', icon: '📦', length: 10, width: 8, height: 4, weight: 1 },
+  { name: 'Large Box', icon: '📦', length: 14, width: 12, height: 6, weight: 2 },
+  { name: 'Flat Envelope', icon: '✉️', length: 12, width: 9, height: 0.5, weight: 0.25 },
+  { name: 'Poly Mailer', icon: '📬', length: 10, width: 7, height: 1, weight: 0.3 },
+  { name: 'Supplements Bottle', icon: '💊', length: 4, width: 4, height: 6, weight: 0.5 },
+];
+
 export function ShippingRatesDialog({
   order,
   open,
@@ -76,6 +86,7 @@ export function ShippingRatesDialog({
   const [selectedRate, setSelectedRate] = useState<string | null>(null);
   const [purchasedLabel, setPurchasedLabel] = useState<PurchaseLabelResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<string | null>('Medium Box');
   
   // Parcel dimensions
   const [parcel, setParcel] = useState({
@@ -84,6 +95,16 @@ export function ShippingRatesDialog({
     height: DEFAULT_PARCEL.height,
     weight: DEFAULT_PARCEL.weight,
   });
+
+  const handlePresetSelect = (preset: typeof PARCEL_PRESETS[0]) => {
+    setSelectedPreset(preset.name);
+    setParcel({
+      length: preset.length,
+      width: preset.width,
+      height: preset.height,
+      weight: preset.weight,
+    });
+  };
 
   // Default warehouse address (should come from settings in production)
   const defaultWarehouse = warehouseAddress || {
@@ -225,16 +246,48 @@ export function ShippingRatesDialog({
               </div>
             </div>
 
-            {/* Parcel Dimensions */}
+            {/* Parcel Presets */}
             <div className="space-y-3">
-              <h4 className="font-medium text-sm">Package Dimensions</h4>
+              <h4 className="font-medium text-sm">Quick Select Package</h4>
+              <div className="grid grid-cols-3 gap-2">
+                {PARCEL_PRESETS.map((preset) => (
+                  <button
+                    key={preset.name}
+                    onClick={() => handlePresetSelect(preset)}
+                    className={cn(
+                      "p-3 rounded-lg border text-left transition-all",
+                      selectedPreset === preset.name
+                        ? "border-primary bg-primary/10 ring-2 ring-primary/20"
+                        : "border-border hover:border-primary/50 hover:bg-muted/50"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{preset.icon}</span>
+                      <div>
+                        <p className="text-xs font-medium">{preset.name}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {preset.length}×{preset.width}×{preset.height}" • {preset.weight}lb
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Dimensions */}
+            <div className="space-y-3">
+              <h4 className="font-medium text-sm text-muted-foreground">Or Custom Dimensions</h4>
               <div className="grid grid-cols-4 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Length (in)</Label>
                   <Input
                     type="number"
                     value={parcel.length}
-                    onChange={(e) => setParcel(p => ({ ...p, length: Number(e.target.value) }))}
+                    onChange={(e) => {
+                      setSelectedPreset(null);
+                      setParcel(p => ({ ...p, length: Number(e.target.value) }));
+                    }}
                     min={1}
                   />
                 </div>
@@ -243,7 +296,10 @@ export function ShippingRatesDialog({
                   <Input
                     type="number"
                     value={parcel.width}
-                    onChange={(e) => setParcel(p => ({ ...p, width: Number(e.target.value) }))}
+                    onChange={(e) => {
+                      setSelectedPreset(null);
+                      setParcel(p => ({ ...p, width: Number(e.target.value) }));
+                    }}
                     min={1}
                   />
                 </div>
@@ -252,7 +308,10 @@ export function ShippingRatesDialog({
                   <Input
                     type="number"
                     value={parcel.height}
-                    onChange={(e) => setParcel(p => ({ ...p, height: Number(e.target.value) }))}
+                    onChange={(e) => {
+                      setSelectedPreset(null);
+                      setParcel(p => ({ ...p, height: Number(e.target.value) }));
+                    }}
                     min={1}
                   />
                 </div>
@@ -261,7 +320,10 @@ export function ShippingRatesDialog({
                   <Input
                     type="number"
                     value={parcel.weight}
-                    onChange={(e) => setParcel(p => ({ ...p, weight: Number(e.target.value) }))}
+                    onChange={(e) => {
+                      setSelectedPreset(null);
+                      setParcel(p => ({ ...p, weight: Number(e.target.value) }));
+                    }}
                     min={0.1}
                     step={0.1}
                   />
