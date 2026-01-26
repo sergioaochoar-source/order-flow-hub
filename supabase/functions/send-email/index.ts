@@ -39,15 +39,26 @@ async function sendEmail(to: string, subject: string, html: string) {
   return response.json();
 }
 
-// Email header with brand logo (text-based for reliability)
+// Email header with styled brand logo
 function getEmailHeader(title: string) {
   return `
     <div style="background: ${BRAND_DARK}; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-      <div style="margin-bottom: 15px;">
-        <span style="font-size: 28px; font-weight: 700; color: ${BRAND_ORANGE};">PEPTIUM</span>
-        <span style="font-size: 28px; font-weight: 300; color: white;"> LAB</span>
-      </div>
-      <h1 style="color: white; margin: 0; font-size: 20px; font-weight: 400;">${title}</h1>
+      <table align="center" cellpadding="0" cellspacing="0" style="margin-bottom: 15px;">
+        <tr>
+          <td style="vertical-align: middle; padding-right: 10px;">
+            <!-- DNA Icon using table cells -->
+            <table cellpadding="0" cellspacing="0" style="width: 40px;">
+              <tr><td style="font-size: 14px; color: ${BRAND_ORANGE}; text-align: center;">●</td></tr>
+              <tr><td style="font-size: 18px; color: ${BRAND_ORANGE}; text-align: center; letter-spacing: -2px;">⧗</td></tr>
+              <tr><td style="font-size: 14px; color: ${BRAND_ORANGE}; text-align: center;">●</td></tr>
+            </table>
+          </td>
+          <td style="vertical-align: middle;">
+            <span style="font-size: 28px; font-weight: 800; color: ${BRAND_ORANGE}; letter-spacing: 2px;">PEPTIUM</span>
+          </td>
+        </tr>
+      </table>
+      <h1 style="color: white; margin: 0; font-size: 18px; font-weight: 400;">${title}</h1>
     </div>
   `;
 }
