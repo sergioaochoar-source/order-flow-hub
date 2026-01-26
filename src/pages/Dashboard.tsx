@@ -15,15 +15,16 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAllOrders } from '@/hooks/useOrders';
 import { useDashboardMetrics } from '@/hooks/useMetrics';
+import { useOrdersPDF } from '@/hooks/useOrdersPDF';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
 import { EmptyOrdersState } from '@/components/EmptyOrdersState';
 import { useMemo, useCallback } from 'react';
-import { Order } from '@/types/order';
 
 export default function Dashboard() {
   const { data: orders = [], isLoading: ordersLoading, isError: ordersError, error: ordersErrorData, refetch: refetchOrders } = useAllOrders();
   const { data: metrics, isLoading: metricsLoading } = useDashboardMetrics();
+  const { generateOrdersPDF } = useOrdersPDF();
 
   // Get date ranges
   const now = new Date();
@@ -75,57 +76,14 @@ export default function Dashboard() {
     };
   }, [orders, metrics, weeklyPaidOrders, monthlyPaidOrders, startOfToday]);
 
-  // CSV Export function
-  const exportOrdersToCSV = useCallback((ordersToExport: Order[], filename: string) => {
-    if (ordersToExport.length === 0) {
-      alert('No hay órdenes para exportar en este período.');
-      return;
-    }
-
-    const headers = [
-      'Número de Orden',
-      'Fecha de Pago',
-      'Cliente',
-      'Email',
-      'Total',
-      'Moneda',
-      'Estado',
-      'Etapa Fulfillment',
-      'Dirección de Envío'
-    ];
-
-    const rows = ordersToExport.map(order => [
-      order.orderNumber,
-      order.paidAt ? format(new Date(order.paidAt), 'yyyy-MM-dd HH:mm') : '',
-      order.customer.name || '',
-      order.customer.email || '',
-      order.total.toFixed(2),
-      order.currency || 'USD',
-      order.status,
-      order.fulfillmentStage,
-      order.shippingAddress ? `${order.shippingAddress.line1 || ''}, ${order.shippingAddress.city || ''}, ${order.shippingAddress.country || ''}` : ''
-    ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${filename}_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-  }, []);
-
+  // PDF Download handlers
   const handleDownloadWeekly = useCallback(() => {
-    exportOrdersToCSV(weeklyPaidOrders, 'ordenes_semana');
-  }, [weeklyPaidOrders, exportOrdersToCSV]);
+    generateOrdersPDF(weeklyPaidOrders, 'week', { start: startOfWeek, end: now });
+  }, [weeklyPaidOrders, generateOrdersPDF, startOfWeek, now]);
 
   const handleDownloadMonthly = useCallback(() => {
-    exportOrdersToCSV(monthlyPaidOrders, 'ordenes_mes');
-  }, [monthlyPaidOrders, exportOrdersToCSV]);
+    generateOrdersPDF(monthlyPaidOrders, 'month', { start: startOfMonth, end: now });
+  }, [monthlyPaidOrders, generateOrdersPDF, startOfMonth, now]);
 
   const recentOrders = weeklyPaidOrders.slice(0, 5);
   const issueOrders = weeklyPaidOrders.filter(o => o.fulfillmentStage === 'issue').slice(0, 3);
@@ -176,11 +134,11 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadWeekly}>
             <Download className="w-4 h-4" />
-            Descargar Semana ({weeklyPaidOrders.length})
+            PDF Semana ({weeklyPaidOrders.length})
           </Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadMonthly}>
             <Download className="w-4 h-4" />
-            Descargar Mes ({monthlyPaidOrders.length})
+            PDF Mes ({monthlyPaidOrders.length})
           </Button>
           <Link to="/fulfillment">
             <Button className="gap-2">
