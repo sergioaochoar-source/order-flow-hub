@@ -6,8 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 };
 
-// Stage transition rules
-const STAGE_ORDER = ["new", "qc", "pick", "pack", "label", "shipped"] as const;
+// Stage transition rules (simplified workflow)
+const STAGE_ORDER = ["new", "label", "shipped"] as const;
 type FulfillmentStage = typeof STAGE_ORDER[number] | "issue";
 
 function getStageIndex(stage: string): number {
@@ -33,7 +33,7 @@ function isValidTransition(fromStage: string, toStage: string): { valid: boolean
     return { valid: true };
   }
 
-  // Normal flow: can only move forward one step or backward
+  // Normal flow: can move forward one step or backward
   const fromIdx = getStageIndex(fromStage);
   const toIdx = getStageIndex(toStage);
 
