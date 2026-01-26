@@ -38,12 +38,12 @@ function normalizeFulfillmentStage(stage: string): FulfillmentStage {
   const stageMap: Record<string, FulfillmentStage> = {
     'new': 'new',
     'paid': 'new',
-    'qc': 'qc',
-    'quality_control': 'qc',
-    'pick': 'pick',
-    'picking': 'pick',
-    'pack': 'pack',
-    'packing': 'pack',
+    'qc': 'label',           // Map old stages to simplified flow
+    'quality_control': 'label',
+    'pick': 'label',
+    'picking': 'label',
+    'pack': 'label',
+    'packing': 'label',
     'label': 'label',
     'labeling': 'label',
     'labelled': 'label',

@@ -1,7 +1,7 @@
 import { FulfillmentStage, Order } from '@/types/order';
 
-// Define the valid stage order
-const STAGE_ORDER: FulfillmentStage[] = ['new', 'qc', 'pick', 'pack', 'label', 'shipped'];
+// Define the valid stage order (simplified: New → Label → Shipped)
+const STAGE_ORDER: FulfillmentStage[] = ['new', 'label', 'shipped'];
 
 // Get the index of a stage in the flow
 function getStageIndex(stage: FulfillmentStage): number {
@@ -21,7 +21,7 @@ export function isValidTransition(
 
   // From Issue, allow moving back to any stage except shipped (requires tracking)
   if (fromStage === 'issue') {
-    const allowedFromIssue: FulfillmentStage[] = ['new', 'qc', 'pick', 'pack', 'label'];
+    const allowedFromIssue: FulfillmentStage[] = ['new', 'label'];
     if (allowedFromIssue.includes(toStage)) {
       return { valid: true };
     }
@@ -29,7 +29,7 @@ export function isValidTransition(
     if (toStage === 'shipped') {
       return {
         valid: false,
-        message: 'Cannot ship directly from Issue. Move to Label stage first and add tracking.',
+        message: 'No se puede enviar directamente desde Issue. Mueve a Label primero y añade tracking.',
       };
     }
   }
@@ -39,14 +39,14 @@ export function isValidTransition(
     if (!order.shipment?.trackingNumber) {
       return {
         valid: false,
-        message: 'Cannot mark as Shipped without tracking information. Add tracking first.',
+        message: 'No se puede marcar como Enviado sin información de tracking. Añade el tracking primero.',
       };
     }
     // Shipped can only come from Label stage
     if (fromStage !== 'label') {
       return {
         valid: false,
-        message: 'Orders must be in Label stage before shipping.',
+        message: 'Las órdenes deben estar en Label antes de enviar.',
       };
     }
     return { valid: true };
@@ -70,7 +70,7 @@ export function isValidTransition(
     const expectedNext = STAGE_ORDER[fromIndex + 1];
     return {
       valid: false,
-      message: `Cannot skip stages. Move to "${expectedNext.toUpperCase()}" first.`,
+      message: `No se puede saltar etapas. Mueve a "${getStageName(expectedNext)}" primero.`,
     };
   }
 
@@ -85,7 +85,7 @@ export function getAvailableTransitions(order: Order): FulfillmentStage[] {
 
   // From Issue, can go back to any prior stage
   if (currentStage === 'issue') {
-    return ['new', 'qc', 'pick', 'pack', 'label'];
+    return ['new', 'label'];
   }
 
   // Already shipped - no transitions
@@ -119,13 +119,10 @@ export function getAvailableTransitions(order: Order): FulfillmentStage[] {
 // Get stage display name
 export function getStageName(stage: FulfillmentStage): string {
   const names: Record<FulfillmentStage, string> = {
-    new: 'New / Paid',
-    qc: 'QC',
-    pick: 'Pick',
-    pack: 'Pack',
-    label: 'Label',
-    shipped: 'Shipped',
-    issue: 'Issue',
+    new: 'Nuevo',
+    label: 'Etiquetado',
+    shipped: 'Enviado',
+    issue: 'Problema',
   };
   return names[stage];
 }

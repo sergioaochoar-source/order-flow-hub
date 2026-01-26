@@ -10,13 +10,10 @@ interface KanbanColumnProps {
 }
 
 const columnConfig: Record<FulfillmentStage, { title: string; color: string }> = {
-  new: { title: 'New / Paid', color: 'bg-status-new' },
-  qc: { title: 'QC', color: 'bg-status-qc' },
-  pick: { title: 'Pick', color: 'bg-status-pick' },
-  pack: { title: 'Pack', color: 'bg-status-pack' },
-  label: { title: 'Label', color: 'bg-status-label' },
-  shipped: { title: 'Shipped', color: 'bg-status-shipped' },
-  issue: { title: 'Issue', color: 'bg-status-issue' },
+  new: { title: 'Nuevo', color: 'bg-status-new' },
+  label: { title: 'Etiquetado', color: 'bg-status-label' },
+  shipped: { title: 'Enviado', color: 'bg-status-shipped' },
+  issue: { title: 'Problema', color: 'bg-status-issue' },
 };
 
 export function KanbanColumn({ status, orders, onOrderClick, onDrop }: KanbanColumnProps) {

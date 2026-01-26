@@ -11,9 +11,6 @@ export type OrderStatus =
 // ============ Fulfillment Stage (Internal workflow) ============
 export type FulfillmentStage = 
   | 'new'
-  | 'qc'
-  | 'pick'
-  | 'pack'
   | 'label'
   | 'shipped'
   | 'issue';
