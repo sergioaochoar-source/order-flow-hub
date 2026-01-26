@@ -27,7 +27,9 @@ export function FulfillmentBoard() {
     };
     
     orders.forEach((order) => {
-      grouped[order.fulfillmentStage].push(order);
+      // Handle legacy stages (qc, pick, pack) by mapping to 'label'
+      const stage = grouped[order.fulfillmentStage] ? order.fulfillmentStage : 'label';
+      grouped[stage].push(order);
     });
     
     return grouped;
