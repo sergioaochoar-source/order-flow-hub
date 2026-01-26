@@ -55,6 +55,7 @@ export interface Shipment {
   service?: string;
   shippedAt?: string;
   estimatedDelivery?: string;
+  labelUrl?: string;
 }
 
 // ============ Order Event ============
@@ -129,6 +130,7 @@ export interface TrackingPayload {
   tracking: string;
   service?: string;
   shippedAt?: string;
+  labelUrl?: string;
 }
 
 // ============ API Config ============

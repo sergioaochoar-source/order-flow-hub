@@ -151,6 +151,7 @@ export type Database = {
         Row: {
           carrier: string
           estimated_delivery: string | null
+          label_url: string | null
           order_id: string
           service: string | null
           shipped_at: string | null
@@ -160,6 +161,7 @@ export type Database = {
         Insert: {
           carrier: string
           estimated_delivery?: string | null
+          label_url?: string | null
           order_id: string
           service?: string | null
           shipped_at?: string | null
@@ -169,6 +171,7 @@ export type Database = {
         Update: {
           carrier?: string
           estimated_delivery?: string | null
+          label_url?: string | null
           order_id?: string
           service?: string | null
           shipped_at?: string | null

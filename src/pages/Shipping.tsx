@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StatusBadge } from '@/components/fulfillment/StatusBadge';
 import { Order } from '@/types/order';
-import { Truck, Package, CheckCircle2, Tag, ExternalLink } from 'lucide-react';
+import { Truck, Package, CheckCircle2, Tag, ExternalLink, FileDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -33,6 +33,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { EmptyOrdersState } from '@/components/EmptyOrdersState';
 import { ShippingRatesDialog } from '@/components/shipping/ShippingRatesDialog';
 import { getWarehouseAddress } from '@/pages/Settings';
+import { getLabelPdfProxyUrl } from '@/lib/shippoApi';
 import { toast } from 'sonner';
 
 const carriers = ['FedEx', 'UPS', 'DHL', 'USPS', 'Estafeta', 'RedPack', 'Other'];
@@ -55,7 +56,7 @@ export default function Shipping() {
   const handleLabelPurchased = async (trackingNum: string, carrierName: string, labelUrl: string) => {
     if (!selectedOrder) return;
 
-    // Auto-fill the tracking form and submit
+    // Auto-fill the tracking form and submit with labelUrl
     addTrackingMutation.mutate(
       { 
         orderId: selectedOrder.id, 
@@ -63,6 +64,7 @@ export default function Shipping() {
           carrier: carrierName,
           tracking: trackingNum,
           shippedAt: new Date().toISOString(),
+          labelUrl: labelUrl, // Save label URL for later download
         }
       },
       {
@@ -70,8 +72,9 @@ export default function Shipping() {
           toast.success(`Order ${selectedOrder.orderNumber} marked as shipped!`);
           setIsRatesDialogOpen(false);
           setSelectedOrder(null);
-          // Open label in new tab
-          window.open(labelUrl, '_blank');
+          // Open label PDF via proxy
+          const proxyUrl = getLabelPdfProxyUrl(labelUrl);
+          window.open(proxyUrl, '_blank');
         }
       }
     );
@@ -232,6 +235,7 @@ export default function Shipping() {
                 <TableHead>Customer</TableHead>
                 <TableHead>Carrier</TableHead>
                 <TableHead>Tracking</TableHead>
+                <TableHead>Label</TableHead>
                 <TableHead>Stage</TableHead>
               </TableRow>
             </TableHeader>
@@ -248,6 +252,24 @@ export default function Shipping() {
                       </code>
                     ) : (
                       '-'
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {order.shipment?.labelUrl ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="gap-1 h-7 px-2"
+                        onClick={() => {
+                          const proxyUrl = getLabelPdfProxyUrl(order.shipment!.labelUrl!);
+                          window.open(proxyUrl, '_blank');
+                        }}
+                      >
+                        <FileDown className="w-3 h-3" />
+                        PDF
+                      </Button>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">-</span>
                     )}
                   </TableCell>
                   <TableCell>
