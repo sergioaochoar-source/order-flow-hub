@@ -7,13 +7,10 @@ interface StatusBadgeProps {
 }
 
 const statusConfig: Record<FulfillmentStage, { label: string; className: string }> = {
-  new: { label: 'New', className: 'status-new' },
-  qc: { label: 'QC', className: 'status-qc' },
-  pick: { label: 'Pick', className: 'status-pick' },
-  pack: { label: 'Pack', className: 'status-pack' },
-  label: { label: 'Label', className: 'status-label' },
-  shipped: { label: 'Shipped', className: 'status-shipped' },
-  issue: { label: 'Issue', className: 'status-issue' },
+  new: { label: 'Nuevo', className: 'status-new' },
+  label: { label: 'Etiquetado', className: 'status-label' },
+  shipped: { label: 'Enviado', className: 'status-shipped' },
+  issue: { label: 'Problema', className: 'status-issue' },
 };
 
 export function StatusBadge({ status, size = 'sm' }: StatusBadgeProps) {

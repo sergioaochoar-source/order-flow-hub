@@ -35,13 +35,10 @@ const orderStatuses: { value: OrderStatus; label: string }[] = [
 ];
 
 const fulfillmentStages: { value: FulfillmentStage; label: string }[] = [
-  { value: 'new', label: 'New' },
-  { value: 'qc', label: 'QC' },
-  { value: 'pick', label: 'Pick' },
-  { value: 'pack', label: 'Pack' },
-  { value: 'label', label: 'Label' },
-  { value: 'shipped', label: 'Shipped' },
-  { value: 'issue', label: 'Issue' },
+  { value: 'new', label: 'Nuevo' },
+  { value: 'label', label: 'Etiquetado' },
+  { value: 'shipped', label: 'Enviado' },
+  { value: 'issue', label: 'Problema' },
 ];
 
 export default function Orders() {

@@ -9,7 +9,7 @@ import { EmptyOrdersState } from '@/components/EmptyOrdersState';
 import { isValidTransition } from '@/lib/fulfillmentRules';
 import { toast } from 'sonner';
 
-const stages: FulfillmentStage[] = ['new', 'qc', 'pick', 'pack', 'label', 'shipped', 'issue'];
+const stages: FulfillmentStage[] = ['new', 'label', 'shipped', 'issue'];
 
 export function FulfillmentBoard() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -21,9 +21,6 @@ export function FulfillmentBoard() {
   const ordersByStage = useMemo(() => {
     const grouped: Record<FulfillmentStage, Order[]> = {
       new: [],
-      qc: [],
-      pick: [],
-      pack: [],
       label: [],
       shipped: [],
       issue: [],
