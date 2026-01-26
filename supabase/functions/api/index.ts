@@ -176,6 +176,7 @@ Deno.serve(async (req) => {
           trackingNumber: shipmentsResult.data.find(s => s.order_id === order.id)!.tracking_number,
           service: shipmentsResult.data.find(s => s.order_id === order.id)!.service,
           shippedAt: shipmentsResult.data.find(s => s.order_id === order.id)!.shipped_at,
+          labelUrl: shipmentsResult.data.find(s => s.order_id === order.id)!.label_url,
         } : undefined,
         notes: order.notes,
         events: eventsResult.data?.filter(e => e.order_id === order.id).map(e => ({
@@ -349,7 +350,7 @@ Deno.serve(async (req) => {
     if (pathParts[0] === "orders" && pathParts[2] === "tracking" && req.method === "POST") {
       const orderId = pathParts[1];
       const body = await req.json();
-      const { carrier, tracking, service, shippedAt, orderStatus } = body;
+      const { carrier, tracking, service, shippedAt, orderStatus, labelUrl } = body;
 
       if (!carrier || !tracking) {
         return new Response(JSON.stringify({ error: "carrier and tracking are required" }), {
@@ -373,16 +374,21 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Upsert shipment
+      // Upsert shipment with label_url
+      const shipmentData: Record<string, unknown> = {
+        order_id: orderId,
+        carrier,
+        tracking_number: tracking,
+        service: service || null,
+        shipped_at: shippedAt || new Date().toISOString(),
+      };
+      if (labelUrl) {
+        shipmentData.label_url = labelUrl;
+      }
+
       const { error: shipmentError } = await supabase
         .from("shipments")
-        .upsert({
-          order_id: orderId,
-          carrier,
-          tracking_number: tracking,
-          service: service || null,
-          shipped_at: shippedAt || new Date().toISOString(),
-        });
+        .upsert(shipmentData);
 
       if (shipmentError) throw shipmentError;
 
@@ -404,7 +410,7 @@ Deno.serve(async (req) => {
         order_id: orderId,
         type: "tracking_added",
         message: `Tracking added: ${carrier} ${tracking}`,
-        meta: { carrier, tracking, service },
+        meta: { carrier, tracking, service, labelUrl },
       });
 
       // Return updated order
@@ -431,6 +437,7 @@ Deno.serve(async (req) => {
           trackingNumber: shipment.tracking_number,
           service: shipment.service,
           shippedAt: shipment.shipped_at,
+          labelUrl: shipment.label_url,
         },
         updatedAt: updatedOrder.updated_at,
       }), {
