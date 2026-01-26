@@ -23,20 +23,42 @@ export default function Dashboard() {
   const { data: orders = [], isLoading: ordersLoading, isError: ordersError, error: ordersErrorData, refetch: refetchOrders } = useAllOrders();
   const { data: metrics, isLoading: metricsLoading } = useDashboardMetrics();
 
-  // Calculate metrics from orders if metrics endpoint not available
+  // Calculate metrics from PAID orders only
   const calculatedMetrics = useMemo(() => {
     if (metrics) return metrics;
     
-    const pendingOrders = orders.filter(o => !['shipped', 'issue'].includes(o.fulfillmentStage)).length;
-    const issueOrders = orders.filter(o => o.fulfillmentStage === 'issue').length;
-    const readyToShip = orders.filter(o => o.fulfillmentStage === 'label').length;
-    const totalOrders = orders.length;
-    const totalSales = orders.reduce((sum, o) => sum + o.total, 0);
+    // Filter to only paid orders (orders with paid_at date)
+    const paidOrders = orders.filter(o => o.paidAt);
+    
+    const pendingOrders = paidOrders.filter(o => !['shipped', 'issue'].includes(o.fulfillmentStage)).length;
+    const issueOrders = paidOrders.filter(o => o.fulfillmentStage === 'issue').length;
+    const readyToShip = paidOrders.filter(o => o.fulfillmentStage === 'label').length;
+    const totalOrders = paidOrders.length;
+    const totalSales = paidOrders.reduce((sum, o) => sum + o.total, 0);
+    
+    // Calculate time-based sales from paid orders
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const todaySales = paidOrders
+      .filter(o => o.paidAt && new Date(o.paidAt) >= startOfToday)
+      .reduce((sum, o) => sum + o.total, 0);
+    
+    const weekSales = paidOrders
+      .filter(o => o.paidAt && new Date(o.paidAt) >= startOfWeek)
+      .reduce((sum, o) => sum + o.total, 0);
+    
+    const monthSales = paidOrders
+      .filter(o => o.paidAt && new Date(o.paidAt) >= startOfMonth)
+      .reduce((sum, o) => sum + o.total, 0);
     
     return {
-      todaySales: totalSales * 0.15,
-      weekSales: totalSales * 0.5,
-      monthSales: totalSales,
+      todaySales,
+      weekSales,
+      monthSales,
       pendingOrders,
       issueOrders,
       readyToShip,
