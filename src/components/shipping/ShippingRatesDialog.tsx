@@ -26,6 +26,7 @@ import {
   getRates, 
   purchaseLabel, 
   orderAddressToShippo, 
+  getLabelPdfProxyUrl,
   DEFAULT_PARCEL,
   type GetRatesResponse,
   type PurchaseLabelResponse 
@@ -438,7 +439,11 @@ export function ShippingRatesDialog({
                   <Button
                     variant="outline"
                     className="w-full gap-2"
-                    onClick={() => window.open(purchasedLabel.labelUrl, '_blank')}
+                    onClick={() => {
+                      // Use proxy URL to avoid browser blocking Shippo CDN
+                      const proxyUrl = getLabelPdfProxyUrl(purchasedLabel.labelUrl);
+                      window.open(proxyUrl, '_blank');
+                    }}
                   >
                     <ExternalLink className="w-4 h-4" />
                     Download Label (PDF)

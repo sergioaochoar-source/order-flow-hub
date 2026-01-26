@@ -125,6 +125,13 @@ export async function trackShipment(carrier: string, trackingNumber: string): Pr
   return shippoFetch(`/tracking/${carrier}/${trackingNumber}`);
 }
 
+// Download label PDF via proxy (avoids browser blocking Shippo CDN)
+export function getLabelPdfProxyUrl(labelUrl: string): string {
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'gmekftctjsytojbdobem';
+  const encodedUrl = encodeURIComponent(labelUrl);
+  return `https://${projectId}.supabase.co/functions/v1/shippo/label-pdf?url=${encodedUrl}`;
+}
+
 // Helper to convert order address to Shippo format
 export function orderAddressToShippo(address: any, customerName?: string, customerEmail?: string): ShippoAddress {
   return {
