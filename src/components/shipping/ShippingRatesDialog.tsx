@@ -188,12 +188,14 @@ export function ShippingRatesDialog({
       // Check for carrier registration errors
       if (errorMessage.includes('registration') || errorMessage.includes('not yet registered')) {
         setError('This carrier is not fully activated in your Shippo account. Please try USPS or another carrier, or activate this carrier at apps.goshippo.com');
-        // Deselect the problematic rate
         setSelectedRate(null);
+      } else if (errorMessage.includes('address') && (errorMessage.includes('invalid') || errorMessage.includes('not found') || errorMessage.includes('validation'))) {
+        setError('The shipping address is invalid or could not be verified. Please check the recipient address (street, city, state, ZIP) and try again.');
+        toast.error('Invalid shipping address');
       } else {
         setError(errorMessage);
+        toast.error('Failed to purchase label');
       }
-      toast.error('Failed to purchase label');
     } finally {
       setIsPurchasing(false);
     }
