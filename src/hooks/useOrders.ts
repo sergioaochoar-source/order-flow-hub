@@ -54,8 +54,9 @@ export function useOrder(id: string) {
 }
 
 // ============ Update Order Status (Optimistic) ============
-// Stages that should trigger customer email notifications
-const EMAIL_NOTIFICATION_STAGES: FulfillmentStage[] = ['qc', 'pick', 'pack', 'label'];
+// Email notifications for stage changes are disabled
+// Only 3 emails are sent: Thank You (on payment), Shipping (on tracking), Follow-up (2 weeks after)
+const EMAIL_NOTIFICATION_STAGES: FulfillmentStage[] = []; // Disabled - no status update emails
 
 export function useUpdateOrderStatus() {
   const queryClient = useQueryClient();
