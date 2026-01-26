@@ -1,16 +1,55 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { Bell, Database, CheckCircle2, Cloud, Truck, RefreshCw } from 'lucide-react';
+import { Bell, Database, CheckCircle2, Cloud, Truck, RefreshCw, MapPin, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { checkHealth } from '@/lib/cloudApi';
+
+// Warehouse address type
+export interface WarehouseAddress {
+  name: string;
+  street1: string;
+  street2?: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+  phone?: string;
+  email?: string;
+}
+
+// Get warehouse from localStorage
+export function getWarehouseAddress(): WarehouseAddress {
+  const stored = localStorage.getItem('warehouse_address');
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      // Return default
+    }
+  }
+  return {
+    name: 'My Warehouse',
+    street1: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: 'US',
+  };
+}
 
 export default function Settings() {
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const queryClient = useQueryClient();
+
+  // Warehouse address state
+  const [warehouse, setWarehouse] = useState<WarehouseAddress>(getWarehouseAddress);
+  const [isSavingWarehouse, setIsSavingWarehouse] = useState(false);
 
   const handleTestConnection = async () => {
     setIsTesting(true);
@@ -41,6 +80,22 @@ export default function Settings() {
   const handleClearCache = () => {
     queryClient.clear();
     toast.success('Cache cleared');
+  };
+
+  const handleSaveWarehouse = () => {
+    setIsSavingWarehouse(true);
+    try {
+      localStorage.setItem('warehouse_address', JSON.stringify(warehouse));
+      toast.success('Warehouse address saved!');
+    } catch (err) {
+      toast.error('Failed to save warehouse address');
+    } finally {
+      setIsSavingWarehouse(false);
+    }
+  };
+
+  const updateWarehouse = (field: keyof WarehouseAddress, value: string) => {
+    setWarehouse(prev => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -96,6 +151,119 @@ export default function Settings() {
           <RefreshCw className={`w-4 h-4 ${isTesting ? 'animate-spin' : ''}`} />
           {isTesting ? 'Testing...' : 'Test Connection'}
         </Button>
+      </div>
+
+      <Separator />
+
+      {/* Warehouse Address */}
+      <div className="bg-card rounded-xl border shadow-sm p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <MapPin className="w-5 h-5 text-primary" />
+          <h2 className="font-semibold text-foreground">Warehouse Address</h2>
+          <span className="ml-auto text-xs bg-primary/20 text-primary px-2 py-1 rounded-full flex items-center gap-1">
+            <Package className="w-3 h-3" />
+            Shippo
+          </span>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          This address will be used as the "Ship From" address when purchasing shipping labels.
+        </p>
+        
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="warehouse-name">Business Name</Label>
+              <Input
+                id="warehouse-name"
+                value={warehouse.name}
+                onChange={(e) => updateWarehouse('name', e.target.value)}
+                placeholder="My Company"
+              />
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="warehouse-street1">Street Address</Label>
+              <Input
+                id="warehouse-street1"
+                value={warehouse.street1}
+                onChange={(e) => updateWarehouse('street1', e.target.value)}
+                placeholder="123 Warehouse St"
+              />
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="warehouse-street2">Apt/Suite (optional)</Label>
+              <Input
+                id="warehouse-street2"
+                value={warehouse.street2 || ''}
+                onChange={(e) => updateWarehouse('street2', e.target.value)}
+                placeholder="Suite 100"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="warehouse-city">City</Label>
+              <Input
+                id="warehouse-city"
+                value={warehouse.city}
+                onChange={(e) => updateWarehouse('city', e.target.value)}
+                placeholder="Los Angeles"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="warehouse-state">State</Label>
+              <Input
+                id="warehouse-state"
+                value={warehouse.state}
+                onChange={(e) => updateWarehouse('state', e.target.value)}
+                placeholder="CA"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="warehouse-zip">ZIP Code</Label>
+              <Input
+                id="warehouse-zip"
+                value={warehouse.zip}
+                onChange={(e) => updateWarehouse('zip', e.target.value)}
+                placeholder="90001"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="warehouse-country">Country</Label>
+              <Input
+                id="warehouse-country"
+                value={warehouse.country}
+                onChange={(e) => updateWarehouse('country', e.target.value)}
+                placeholder="US"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="warehouse-phone">Phone (optional)</Label>
+              <Input
+                id="warehouse-phone"
+                value={warehouse.phone || ''}
+                onChange={(e) => updateWarehouse('phone', e.target.value)}
+                placeholder="+1 555 123 4567"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="warehouse-email">Email (optional)</Label>
+              <Input
+                id="warehouse-email"
+                type="email"
+                value={warehouse.email || ''}
+                onChange={(e) => updateWarehouse('email', e.target.value)}
+                placeholder="shipping@company.com"
+              />
+            </div>
+          </div>
+          
+          <Button 
+            onClick={handleSaveWarehouse}
+            disabled={isSavingWarehouse || !warehouse.name || !warehouse.street1 || !warehouse.city || !warehouse.state || !warehouse.zip}
+            className="gap-2"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            {isSavingWarehouse ? 'Saving...' : 'Save Warehouse Address'}
+          </Button>
+        </div>
       </div>
 
       <Separator />
