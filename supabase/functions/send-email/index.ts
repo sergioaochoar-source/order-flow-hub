@@ -35,6 +35,33 @@ async function sendEmail(to: string, subject: string, html: string) {
   return response.json();
 }
 
+// Brand colors
+const BRAND_ORANGE = "#E85D1C";
+const BRAND_DARK = "#1a1a1a";
+const LOGO_URL = "https://id-preview--bb0f3b78-b0d6-40e6-b73c-397601de4ee9.lovable.app/images/peptium-logo.png";
+
+// Email header with logo
+function getEmailHeader(title: string) {
+  return `
+    <div style="background: ${BRAND_DARK}; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+      <img src="${LOGO_URL}" alt="Peptium Lab" style="height: 50px; margin-bottom: 15px;" />
+      <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 500;">${title}</h1>
+    </div>
+  `;
+}
+
+// Email footer
+function getEmailFooter() {
+  return `
+    <div style="background: ${BRAND_DARK}; padding: 25px; border-radius: 0 0 10px 10px; text-align: center;">
+      <p style="color: #888; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} Peptium Lab. Todos los derechos reservados.</p>
+      <p style="color: #666; font-size: 11px; margin: 10px 0 0 0;">
+        <a href="https://peptiumlab.com" style="color: ${BRAND_ORANGE}; text-decoration: none;">peptiumlab.com</a>
+      </p>
+    </div>
+  `;
+}
+
 // Shipping confirmation email template
 function getShippingConfirmationEmail(orderNumber: string, customerName: string, carrier: string, trackingNumber: string, trackingUrl?: string) {
   const trackingLink = trackingUrl || getTrackingUrl(carrier, trackingNumber);
@@ -48,47 +75,43 @@ function getShippingConfirmationEmail(orderNumber: string, customerName: string,
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
       </head>
-      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">¡Tu pedido está en camino! 📦</h1>
-        </div>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
+        ${getEmailHeader("¡Tu pedido está en camino! 📦")}
         
-        <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
-          <p style="font-size: 16px;">Hola <strong>${customerName || 'Cliente'}</strong>,</p>
+        <div style="background: white; padding: 30px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
+          <p style="font-size: 16px; margin-top: 0;">Hola <strong>${customerName || 'Cliente'}</strong>,</p>
           
-          <p>Nos complace informarte que tu pedido <strong>#${orderNumber}</strong> ha sido enviado.</p>
+          <p>Nos complace informarte que tu pedido <strong style="color: ${BRAND_ORANGE};">#${orderNumber}</strong> ha sido enviado.</p>
           
-          <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <h3 style="margin: 0 0 15px 0; color: #374151;">Información del envío</h3>
+          <div style="background: #fafafa; border: 1px solid #e5e7eb; border-left: 4px solid ${BRAND_ORANGE}; border-radius: 0 8px 8px 0; padding: 20px; margin: 25px 0;">
+            <h3 style="margin: 0 0 15px 0; color: ${BRAND_DARK}; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Información del envío</h3>
             <table style="width: 100%; border-collapse: collapse;">
               <tr>
-                <td style="padding: 8px 0; color: #6b7280;">Transportista:</td>
-                <td style="padding: 8px 0; font-weight: 600;">${carrier}</td>
+                <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Transportista:</td>
+                <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_DARK};">${carrier}</td>
               </tr>
               <tr>
-                <td style="padding: 8px 0; color: #6b7280;">Número de rastreo:</td>
-                <td style="padding: 8px 0; font-weight: 600;">${trackingNumber}</td>
+                <td style="padding: 10px 0; color: #6b7280; font-size: 14px; border-top: 1px solid #eee;">Número de rastreo:</td>
+                <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_DARK}; border-top: 1px solid #eee; font-family: monospace;">${trackingNumber}</td>
               </tr>
             </table>
           </div>
           
           ${trackingLink ? `
-          <div style="text-align: center; margin: 25px 0;">
-            <a href="${trackingLink}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 16px;">
-              Rastrear mi pedido
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${trackingLink}" style="display: inline-block; background: ${BRAND_ORANGE}; color: white; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 12px rgba(232, 93, 28, 0.3);">
+              Rastrear mi pedido →
             </a>
           </div>
           ` : ''}
           
-          <p style="color: #6b7280; font-size: 14px;">Si tienes alguna pregunta sobre tu pedido, no dudes en contactarnos.</p>
+          <p style="color: #6b7280; font-size: 14px; margin-top: 25px;">Si tienes alguna pregunta sobre tu pedido, no dudes en contactarnos.</p>
           
-          <p style="margin-top: 30px;">¡Gracias por tu compra!</p>
-          <p style="color: #6b7280;">El equipo de Peptium Lab</p>
+          <p style="margin-top: 30px; margin-bottom: 0;">¡Gracias por tu compra!</p>
+          <p style="color: ${BRAND_ORANGE}; font-weight: 600; margin-top: 5px;">El equipo de Peptium Lab</p>
         </div>
         
-        <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
-          <p>© ${new Date().getFullYear()} Peptium Lab. Todos los derechos reservados.</p>
-        </div>
+        ${getEmailFooter()}
       </body>
       </html>
     `,
@@ -99,6 +122,7 @@ function getShippingConfirmationEmail(orderNumber: string, customerName: string,
 function getStatusUpdateEmail(orderNumber: string, customerName: string, newStatus: string, statusMessage: string) {
   const statusEmoji = getStatusEmoji(newStatus);
   const statusLabel = getStatusLabel(newStatus);
+  const statusColor = getStatusColor(newStatus);
   
   return {
     subject: `${statusEmoji} Actualización de tu pedido #${orderNumber}`,
@@ -109,35 +133,46 @@ function getStatusUpdateEmail(orderNumber: string, customerName: string, newStat
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
       </head>
-      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">Actualización de pedido ${statusEmoji}</h1>
-        </div>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
+        ${getEmailHeader(`Actualización de pedido ${statusEmoji}`)}
         
-        <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
-          <p style="font-size: 16px;">Hola <strong>${customerName || 'Cliente'}</strong>,</p>
+        <div style="background: white; padding: 30px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
+          <p style="font-size: 16px; margin-top: 0;">Hola <strong>${customerName || 'Cliente'}</strong>,</p>
           
-          <p>Tu pedido <strong>#${orderNumber}</strong> ha sido actualizado.</p>
+          <p>Tu pedido <strong style="color: ${BRAND_ORANGE};">#${orderNumber}</strong> ha sido actualizado.</p>
           
-          <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
-            <p style="font-size: 14px; color: #6b7280; margin: 0 0 10px 0;">Estado actual:</p>
-            <p style="font-size: 24px; font-weight: 700; color: #374151; margin: 0;">${statusEmoji} ${statusLabel}</p>
-            ${statusMessage ? `<p style="color: #6b7280; margin: 15px 0 0 0;">${statusMessage}</p>` : ''}
+          <div style="background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 25px; margin: 25px 0; text-align: center;">
+            <p style="font-size: 12px; color: #6b7280; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px;">Estado actual</p>
+            <div style="display: inline-block; background: ${statusColor}; color: white; padding: 10px 24px; border-radius: 50px; font-size: 16px; font-weight: 600;">
+              ${statusEmoji} ${statusLabel}
+            </div>
+            ${statusMessage ? `<p style="color: #6b7280; margin: 20px 0 0 0; font-size: 14px;">${statusMessage}</p>` : ''}
           </div>
           
-          <p style="color: #6b7280; font-size: 14px;">Si tienes alguna pregunta sobre tu pedido, no dudes en contactarnos.</p>
+          <p style="color: #6b7280; font-size: 14px; margin-top: 25px;">Si tienes alguna pregunta sobre tu pedido, no dudes en contactarnos.</p>
           
-          <p style="margin-top: 30px;">¡Gracias por tu compra!</p>
-          <p style="color: #6b7280;">El equipo de Peptium Lab</p>
+          <p style="margin-top: 30px; margin-bottom: 0;">¡Gracias por tu compra!</p>
+          <p style="color: ${BRAND_ORANGE}; font-weight: 600; margin-top: 5px;">El equipo de Peptium Lab</p>
         </div>
         
-        <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
-          <p>© ${new Date().getFullYear()} Peptium Lab. Todos los derechos reservados.</p>
-        </div>
+        ${getEmailFooter()}
       </body>
       </html>
     `,
   };
+}
+
+function getStatusColor(status: string): string {
+  const colors: Record<string, string> = {
+    'new': '#3b82f6',
+    'qc': '#8b5cf6',
+    'pick': '#f59e0b',
+    'pack': '#06b6d4',
+    'label': '#10b981',
+    'shipped': BRAND_ORANGE,
+    'issue': '#ef4444',
+  };
+  return colors[status.toLowerCase()] || BRAND_ORANGE;
 }
 
 function getTrackingUrl(carrier: string, trackingNumber: string): string {
