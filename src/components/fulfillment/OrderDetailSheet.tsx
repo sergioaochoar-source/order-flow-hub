@@ -21,6 +21,7 @@ import { StatusBadge } from './StatusBadge';
 import { ShipConfirmDialog } from './ShipConfirmDialog';
 import { Order, FulfillmentStage, TrackingPayload } from '@/types/order';
 import { useAddTracking } from '@/hooks/useOrders';
+import { sendShippingConfirmation } from '@/lib/emailApi';
 import { 
   Package, 
   User, 
@@ -91,7 +92,7 @@ export function OrderDetailSheet({
         payload: pendingPayload,
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           // Update local state for immediate feedback
           const updatedOrder: Order = {
             ...order,
@@ -105,6 +106,23 @@ export function OrderDetailSheet({
             updatedAt: new Date().toISOString(),
           };
           onUpdateOrder(updatedOrder);
+          
+          // Send shipping confirmation email
+          if (order.customer.email) {
+            try {
+              await sendShippingConfirmation({
+                to: order.customer.email,
+                orderNumber: order.orderNumber,
+                customerName: order.customer.name,
+                carrier: pendingPayload.carrier,
+                trackingNumber: pendingPayload.tracking,
+              });
+              toast.success('📧 Shipping confirmation email sent');
+            } catch (emailError) {
+              console.error('Failed to send shipping email:', emailError);
+              toast.warning('Order shipped, but email notification failed');
+            }
+          }
           
           // Reset state
           setShowShipConfirm(false);
