@@ -215,7 +215,7 @@ export function ShippingRatesDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-2xl h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Truck className="w-5 h-5" />
@@ -226,7 +226,8 @@ export function ShippingRatesDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          <ScrollArea className="flex-1 pr-4">
           <div className="space-y-6">
             {/* Ship To */}
             <div className="bg-muted/50 p-4 rounded-lg space-y-2">
@@ -362,7 +363,7 @@ export function ShippingRatesDialog({
               <div className="space-y-3">
                 <Separator />
                 <h4 className="font-medium text-sm">Available Rates</h4>
-                <div className="space-y-2">
+                <div className="space-y-2 pb-4">
                   {rates.map((rate) => (
                     <button
                       key={rate.object_id}
@@ -397,25 +398,6 @@ export function ShippingRatesDialog({
                     </button>
                   ))}
                 </div>
-
-                <Button
-                  onClick={handlePurchaseLabel}
-                  disabled={!selectedRate || isPurchasing}
-                  className="w-full gap-2"
-                  size="lg"
-                >
-                  {isPurchasing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Purchasing label...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      Purchase Label
-                    </>
-                  )}
-                </Button>
               </div>
             )}
 
@@ -458,7 +440,32 @@ export function ShippingRatesDialog({
               </div>
             )}
           </div>
-        </ScrollArea>
+          </ScrollArea>
+
+          {/* Fixed Purchase Button */}
+          {rates.length > 0 && !purchasedLabel && (
+            <div className="border-t bg-background pt-4 px-1">
+              <Button
+                onClick={handlePurchaseLabel}
+                disabled={!selectedRate || isPurchasing}
+                className="w-full gap-2"
+                size="lg"
+              >
+                {isPurchasing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Purchasing label...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Purchase Label {selectedRate && `($${rates.find(r => r.object_id === selectedRate)?.amount})`}
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
