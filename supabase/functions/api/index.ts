@@ -115,6 +115,8 @@ Deno.serve(async (req) => {
       const page = parseInt(url.searchParams.get("page") || "1");
       const limit = parseInt(url.searchParams.get("limit") || "20");
       const sort = url.searchParams.get("sort") || "-createdAt";
+      const paidOnly = url.searchParams.get("paidOnly") === "true";
+      const unpaidOnly = url.searchParams.get("unpaidOnly") === "true";
 
       let query = supabase.from("orders").select("*", { count: "exact" });
 
@@ -123,6 +125,14 @@ Deno.serve(async (req) => {
       if (stage) query = query.eq("fulfillment_stage", stage);
       if (q) {
         query = query.or(`order_number.ilike.%${q}%,customer_name.ilike.%${q}%,customer_email.ilike.%${q}%`);
+      }
+      
+      // Payment filter
+      if (paidOnly) {
+        query = query.not("paid_at", "is", null);
+      }
+      if (unpaidOnly) {
+        query = query.is("paid_at", null);
       }
 
       // Sorting

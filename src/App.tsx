@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
 import Fulfillment from "./pages/Fulfillment";
 import Orders from "./pages/Orders";
+import ProspectClients from "./pages/ProspectClients";
 import Shipping from "./pages/Shipping";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/fulfillment" element={<Fulfillment />} />
             <Route path="/orders" element={<Orders />} />
+            <Route path="/prospects" element={<ProspectClients />} />
             <Route path="/shipping" element={<Shipping />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />

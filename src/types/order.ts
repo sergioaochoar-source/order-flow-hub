@@ -110,6 +110,8 @@ export interface OrderFilters {
   page?: number;
   limit?: number;
   sort?: 'createdAt' | '-createdAt' | 'total' | '-total' | 'orderNumber' | '-orderNumber';
+  paidOnly?: boolean;
+  unpaidOnly?: boolean;
 }
 
 // ============ Dashboard Metrics ============
