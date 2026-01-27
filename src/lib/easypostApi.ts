@@ -129,11 +129,11 @@ export function getLabelPdfProxyUrl(labelUrl: string): string {
 export function orderAddressToEasyPost(address: any, customerName?: string, customerEmail?: string): EasyPostAddress {
   return {
     name: address?.name || customerName || '',
-    street1: address?.address_1 || address?.street1 || '',
-    street2: address?.address_2 || address?.street2 || '',
+    street1: address?.address_1 || address?.street1 || address?.line1 || '',
+    street2: address?.address_2 || address?.street2 || address?.line2 || '',
     city: address?.city || '',
     state: address?.state || '',
-    zip: address?.postcode || address?.zip || '',
+    zip: address?.postalCode || address?.postcode || address?.zip || '',
     country: address?.country || 'US',
     phone: address?.phone || '',
     email: customerEmail || address?.email || '',
