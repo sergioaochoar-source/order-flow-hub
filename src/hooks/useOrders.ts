@@ -44,11 +44,11 @@ export function useProspectOrders(filters: OrderFilters = {}) {
   });
 }
 
-// ============ Fetch All Orders (for Kanban) ============
+// ============ Fetch All Paid Orders (for Kanban) ============
 export function useAllOrders() {
   return useQuery({
     queryKey: orderKeys.lists(),
-    queryFn: () => fetchOrders({ limit: 1000 }),
+    queryFn: () => fetchOrders({ limit: 1000, paidOnly: true }),
     enabled: isCloudApiConfigured(),
     staleTime: 30 * 1000,
     refetchInterval: 60 * 1000,
