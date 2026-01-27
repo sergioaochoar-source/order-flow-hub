@@ -25,12 +25,13 @@ import { Order } from '@/types/order';
 import { 
   getRates, 
   purchaseLabel, 
-  orderAddressToShippo, 
+  orderAddressToEasyPost, 
   getLabelPdfProxyUrl,
   DEFAULT_PARCEL,
   type GetRatesResponse,
-  type PurchaseLabelResponse 
-} from '@/lib/shippoApi';
+  type PurchaseLabelResponse,
+  type EasyPostRate,
+} from '@/lib/easypostApi';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -49,19 +50,6 @@ interface ShippingRatesDialogProps {
     phone?: string;
     email?: string;
   };
-}
-
-interface ShippoRate {
-  object_id: string;
-  provider: string;
-  servicelevel: {
-    name: string;
-    token: string;
-  };
-  amount: string;
-  currency: string;
-  estimated_days: number;
-  duration_terms: string;
 }
 
 // Parcel presets for quick selection
@@ -83,7 +71,8 @@ export function ShippingRatesDialog({
 }: ShippingRatesDialogProps) {
   const [isLoadingRates, setIsLoadingRates] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
-  const [rates, setRates] = useState<ShippoRate[]>([]);
+  const [shipmentId, setShipmentId] = useState<string | null>(null);
+  const [rates, setRates] = useState<EasyPostRate[]>([]);
   const [selectedRate, setSelectedRate] = useState<string | null>(null);
   const [purchasedLabel, setPurchasedLabel] = useState<PurchaseLabelResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -126,10 +115,11 @@ export function ShippingRatesDialog({
     setError(null);
     setRates([]);
     setSelectedRate(null);
+    setShipmentId(null);
     setPurchasedLabel(null);
 
     try {
-      const addressTo = orderAddressToShippo(
+      const addressTo = orderAddressToEasyPost(
         {
           address_1: order.shippingAddress.line1,
           address_2: order.shippingAddress.line2,
@@ -145,19 +135,17 @@ export function ShippingRatesDialog({
       const response = await getRates({
         addressFrom: defaultWarehouse,
         addressTo,
-        parcels: [{
-          ...parcel,
-          distance_unit: 'in',
-          mass_unit: 'lb',
-        }],
+        parcel: {
+          length: parcel.length,
+          width: parcel.width,
+          height: parcel.height,
+          weight: parcel.weight,
+        },
       });
 
       if (response.rates && response.rates.length > 0) {
-        // Sort by price
-        const sortedRates = response.rates.sort(
-          (a, b) => parseFloat(a.amount) - parseFloat(b.amount)
-        );
-        setRates(sortedRates);
+        setShipmentId(response.shipment.id);
+        setRates(response.rates);
       } else {
         setError('No shipping rates available for this address');
       }
@@ -170,13 +158,13 @@ export function ShippingRatesDialog({
   };
 
   const handlePurchaseLabel = async () => {
-    if (!selectedRate || !order) return;
+    if (!selectedRate || !order || !shipmentId) return;
 
     setIsPurchasing(true);
     setError(null);
 
     try {
-      const result = await purchaseLabel(selectedRate);
+      const result = await purchaseLabel(shipmentId, selectedRate);
       setPurchasedLabel(result);
       toast.success('🎉 Shipping label purchased successfully!');
       
@@ -186,11 +174,8 @@ export function ShippingRatesDialog({
       console.error('Failed to purchase label:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to purchase label';
       
-      // Check for carrier registration errors
-      if (errorMessage.includes('registration') || errorMessage.includes('not yet registered')) {
-        setError('This carrier is not fully activated in your Shippo account. Please try USPS or another carrier, or activate this carrier at apps.goshippo.com');
-        setSelectedRate(null);
-      } else if (errorMessage.includes('address') && (errorMessage.includes('invalid') || errorMessage.includes('not found') || errorMessage.includes('validation'))) {
+      // Check for address errors
+      if (errorMessage.includes('address') && (errorMessage.includes('invalid') || errorMessage.includes('not found') || errorMessage.includes('validation'))) {
         setError('The shipping address is invalid or could not be verified. Please check the recipient address (street, city, state, ZIP) and try again.');
         toast.error('Invalid shipping address');
       } else {
@@ -208,19 +193,27 @@ export function ShippingRatesDialog({
     setTimeout(() => {
       setRates([]);
       setSelectedRate(null);
+      setShipmentId(null);
       setPurchasedLabel(null);
       setError(null);
     }, 300);
   };
 
-  const getCarrierLogo = (provider: string) => {
+  const getCarrierLogo = (carrier: string) => {
     const logos: Record<string, string> = {
       'USPS': '📦',
       'UPS': '🟤',
       'FedEx': '🟣',
       'DHL': '🟡',
+      'DHLExpress': '🟡',
     };
-    return logos[provider] || '📬';
+    return logos[carrier] || '📬';
+  };
+
+  const getDeliveryDays = (rate: EasyPostRate): string => {
+    if (rate.delivery_days) return `${rate.delivery_days} days`;
+    if (rate.est_delivery_days) return `~${rate.est_delivery_days} days`;
+    return 'Varies';
   };
 
   if (!order) return null;
@@ -378,32 +371,32 @@ export function ShippingRatesDialog({
                 <div className="space-y-2 pb-4">
                   {rates.map((rate) => (
                     <button
-                      key={rate.object_id}
-                      onClick={() => setSelectedRate(rate.object_id)}
+                      key={rate.id}
+                      onClick={() => setSelectedRate(rate.id)}
                       className={cn(
                         "w-full p-4 rounded-lg border text-left transition-all",
-                        selectedRate === rate.object_id
+                        selectedRate === rate.id
                           ? "border-primary bg-primary/5 ring-2 ring-primary/20"
                           : "border-border hover:border-primary/50 hover:bg-muted/50"
                       )}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <span className="text-2xl">{getCarrierLogo(rate.provider)}</span>
+                          <span className="text-2xl">{getCarrierLogo(rate.carrier)}</span>
                           <div>
-                            <p className="font-medium">{rate.provider}</p>
+                            <p className="font-medium">{rate.carrier}</p>
                             <p className="text-sm text-muted-foreground">
-                              {rate.servicelevel.name}
+                              {rate.service}
                             </p>
                           </div>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-lg">
-                            ${parseFloat(rate.amount).toFixed(2)}
+                            ${parseFloat(rate.rate).toFixed(2)}
                           </p>
                           <p className="text-xs text-muted-foreground flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {rate.estimated_days} days
+                            {getDeliveryDays(rate)}
                           </p>
                         </div>
                       </div>
@@ -429,6 +422,10 @@ export function ShippingRatesDialog({
                       <span className="font-medium">{purchasedLabel.carrier}</span>
                     </p>
                     <p>
+                      <span className="text-muted-foreground">Service:</span>{' '}
+                      <span className="font-medium">{purchasedLabel.service}</span>
+                    </p>
+                    <p>
                       <span className="text-muted-foreground">Tracking:</span>{' '}
                       <code className="bg-muted px-2 py-0.5 rounded text-xs">
                         {purchasedLabel.trackingNumber}
@@ -440,7 +437,6 @@ export function ShippingRatesDialog({
                     variant="outline"
                     className="w-full gap-2"
                     onClick={() => {
-                      // Use proxy URL to avoid browser blocking Shippo CDN
                       const proxyUrl = getLabelPdfProxyUrl(purchasedLabel.labelUrl);
                       window.open(proxyUrl, '_blank');
                     }}
@@ -475,7 +471,7 @@ export function ShippingRatesDialog({
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    Purchase Label {selectedRate && `($${rates.find(r => r.object_id === selectedRate)?.amount})`}
+                    Purchase Label {selectedRate && `($${rates.find(r => r.id === selectedRate)?.rate})`}
                   </>
                 )}
               </Button>

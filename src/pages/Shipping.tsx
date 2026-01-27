@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StatusBadge } from '@/components/fulfillment/StatusBadge';
 import { Order } from '@/types/order';
-import { Truck, Package, CheckCircle2, Tag, ExternalLink, FileDown } from 'lucide-react';
+import { Truck, Package, CheckCircle2, Tag, FileDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -33,7 +33,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { EmptyOrdersState } from '@/components/EmptyOrdersState';
 import { ShippingRatesDialog } from '@/components/shipping/ShippingRatesDialog';
 import { getWarehouseAddress } from '@/pages/Settings';
-import { getLabelPdfProxyUrl } from '@/lib/shippoApi';
+import { getLabelPdfProxyUrl } from '@/lib/easypostApi';
 import { toast } from 'sonner';
 
 const carriers = ['FedEx', 'UPS', 'DHL', 'USPS', 'Estafeta', 'RedPack', 'Other'];
@@ -52,7 +52,7 @@ export default function Shipping() {
   const readyToShip = orders.filter(o => o.fulfillmentStage === 'label');
   const recentlyShipped = orders.filter(o => o.fulfillmentStage === 'shipped').slice(0, 10);
 
-  // Handle label purchased from Shippo
+  // Handle label purchased from EasyPost
   const handleLabelPurchased = async (trackingNum: string, carrierName: string, labelUrl: string) => {
     if (!selectedOrder) return;
 
@@ -353,7 +353,7 @@ export default function Shipping() {
         </DialogContent>
       </Dialog>
 
-      {/* Shippo Rates Dialog */}
+      {/* EasyPost Rates Dialog */}
       <ShippingRatesDialog
         order={selectedOrder}
         open={isRatesDialogOpen}
