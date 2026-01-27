@@ -1,11 +1,11 @@
-// Shippo API client for shipping labels
+// EasyPost API client for shipping labels
 
 const getApiBaseUrl = () => {
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'gmekftctjsytojbdobem';
-  return `https://${projectId}.supabase.co/functions/v1/shippo`;
+  return `https://${projectId}.supabase.co/functions/v1/easypost`;
 };
 
-interface ShippoAddress {
+export interface EasyPostAddress {
   name: string;
   street1: string;
   street2?: string;
@@ -17,57 +17,50 @@ interface ShippoAddress {
   email?: string;
 }
 
-interface ShippoParcel {
+export interface EasyPostParcel {
   length: number;
   width: number;
   height: number;
-  distance_unit: 'in' | 'cm';
-  weight: number;
-  mass_unit: 'lb' | 'kg' | 'oz' | 'g';
+  weight: number; // in lb
 }
 
-interface ShippoRate {
-  object_id: string;
-  provider: string;
-  servicelevel: {
-    name: string;
-    token: string;
-  };
-  amount: string;
+export interface EasyPostRate {
+  id: string;
+  carrier: string;
+  service: string;
+  rate: string;
   currency: string;
-  estimated_days: number;
-  duration_terms: string;
-}
-
-interface ShippoTransaction {
-  object_id: string;
-  status: string;
-  label_url: string;
-  tracking_number: string;
-  tracking_url_provider: string;
-  rate: ShippoRate;
+  delivery_days: number | null;
+  delivery_date: string | null;
+  delivery_date_guaranteed: boolean;
+  est_delivery_days: number | null;
 }
 
 export interface GetRatesParams {
-  addressFrom: ShippoAddress;
-  addressTo: ShippoAddress;
-  parcels: ShippoParcel[];
+  addressFrom: EasyPostAddress;
+  addressTo: EasyPostAddress;
+  parcel: EasyPostParcel;
 }
 
 export interface GetRatesResponse {
-  shipment: any;
-  rates: ShippoRate[];
+  shipment: {
+    id: string;
+    from_address: any;
+    to_address: any;
+  };
+  rates: EasyPostRate[];
 }
 
 export interface PurchaseLabelResponse {
   success: boolean;
-  transaction: ShippoTransaction;
   labelUrl: string;
   trackingNumber: string;
   carrier: string;
+  service: string;
+  trackingUrl?: string;
 }
 
-async function shippoFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function easypostFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
@@ -93,28 +86,28 @@ async function shippoFetch<T>(endpoint: string, options: RequestInit = {}): Prom
 
 // Get available carrier accounts
 export async function getCarriers(): Promise<any> {
-  return shippoFetch('/carriers');
+  return easypostFetch('/carriers');
 }
 
 // Get shipping rates for a shipment
 export async function getRates(params: GetRatesParams): Promise<GetRatesResponse> {
-  return shippoFetch('/rates', {
+  return easypostFetch('/rates', {
     method: 'POST',
     body: JSON.stringify(params),
   });
 }
 
 // Purchase a shipping label
-export async function purchaseLabel(rateId: string): Promise<PurchaseLabelResponse> {
-  return shippoFetch('/labels', {
+export async function purchaseLabel(shipmentId: string, rateId: string): Promise<PurchaseLabelResponse> {
+  return easypostFetch('/labels', {
     method: 'POST',
-    body: JSON.stringify({ rateId }),
+    body: JSON.stringify({ shipmentId, rateId }),
   });
 }
 
 // Validate an address
-export async function validateAddress(address: ShippoAddress): Promise<any> {
-  return shippoFetch('/validate-address', {
+export async function validateAddress(address: EasyPostAddress): Promise<any> {
+  return easypostFetch('/validate-address', {
     method: 'POST',
     body: JSON.stringify(address),
   });
@@ -122,18 +115,18 @@ export async function validateAddress(address: ShippoAddress): Promise<any> {
 
 // Track a shipment
 export async function trackShipment(carrier: string, trackingNumber: string): Promise<any> {
-  return shippoFetch(`/tracking/${carrier}/${trackingNumber}`);
+  return easypostFetch(`/tracking/${carrier}/${trackingNumber}`);
 }
 
-// Download label PDF via proxy (avoids browser blocking Shippo CDN)
+// Download label PDF via proxy
 export function getLabelPdfProxyUrl(labelUrl: string): string {
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'gmekftctjsytojbdobem';
   const encodedUrl = encodeURIComponent(labelUrl);
-  return `https://${projectId}.supabase.co/functions/v1/shippo/label-pdf?url=${encodedUrl}`;
+  return `https://${projectId}.supabase.co/functions/v1/easypost/label-pdf?url=${encodedUrl}`;
 }
 
-// Helper to convert order address to Shippo format
-export function orderAddressToShippo(address: any, customerName?: string, customerEmail?: string): ShippoAddress {
+// Helper to convert order address to EasyPost format
+export function orderAddressToEasyPost(address: any, customerName?: string, customerEmail?: string): EasyPostAddress {
   return {
     name: address?.name || customerName || '',
     street1: address?.address_1 || address?.street1 || '',
@@ -148,11 +141,9 @@ export function orderAddressToShippo(address: any, customerName?: string, custom
 }
 
 // Default parcel for standard shipments
-export const DEFAULT_PARCEL: ShippoParcel = {
+export const DEFAULT_PARCEL: EasyPostParcel = {
   length: 10,
   width: 8,
   height: 4,
-  distance_unit: 'in',
-  weight: 1,
-  mass_unit: 'lb',
+  weight: 1, // lb
 };
