@@ -119,18 +119,16 @@ export function ShippingRatesDialog({
     setPurchasedLabel(null);
 
     try {
+      // Debug: log the order shipping address
+      console.log('Order shippingAddress:', JSON.stringify(order.shippingAddress, null, 2));
+      
       const addressTo = orderAddressToEasyPost(
-        {
-          address_1: order.shippingAddress.line1,
-          address_2: order.shippingAddress.line2,
-          city: order.shippingAddress.city,
-          state: order.shippingAddress.state,
-          postcode: order.shippingAddress.postalCode,
-          country: order.shippingAddress.country,
-        },
+        order.shippingAddress,
         order.customer.name,
         order.customer.email
       );
+      
+      console.log('Converted addressTo:', JSON.stringify(addressTo, null, 2));
 
       const response = await getRates({
         addressFrom: defaultWarehouse,
