@@ -4,7 +4,8 @@ import {
   Package, 
   Truck,
   Settings,
-  ChevronLeft
+  ChevronLeft,
+  Users
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import {
@@ -25,6 +26,7 @@ const navigation = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
   { title: 'Fulfillment', url: '/fulfillment', icon: Kanban },
   { title: 'Orders', url: '/orders', icon: Package },
+  { title: 'Prospects', url: '/prospects', icon: Users },
   { title: 'Shipping', url: '/shipping', icon: Truck },
 ];
 

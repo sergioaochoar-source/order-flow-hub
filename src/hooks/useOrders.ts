@@ -20,11 +20,23 @@ export const orderKeys = {
   detail: (id: string) => [...orderKeys.details(), id] as const,
 };
 
-// ============ Fetch Orders with Filters ============
+// ============ Fetch Paid Orders with Filters ============
 export function useOrders(filters: OrderFilters = {}) {
   return useQuery({
-    queryKey: orderKeys.list(filters),
-    queryFn: () => fetchOrders(filters),
+    queryKey: orderKeys.list({ ...filters, paidOnly: true }),
+    queryFn: () => fetchOrders({ ...filters, paidOnly: true }),
+    enabled: isCloudApiConfigured(),
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
+    select: (data: PaginatedResponse<Order>) => data,
+  });
+}
+
+// ============ Fetch Unpaid/Prospect Orders ============
+export function useProspectOrders(filters: OrderFilters = {}) {
+  return useQuery({
+    queryKey: orderKeys.list({ ...filters, unpaidOnly: true }),
+    queryFn: () => fetchOrders({ ...filters, unpaidOnly: true }),
     enabled: isCloudApiConfigured(),
     staleTime: 30 * 1000,
     refetchInterval: 60 * 1000,

@@ -63,6 +63,8 @@ function buildQueryParams(filters: OrderFilters): string {
   if (filters.page) params.set('page', String(filters.page));
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.sort) params.set('sort', filters.sort);
+  if (filters.paidOnly) params.set('paidOnly', 'true');
+  if (filters.unpaidOnly) params.set('unpaidOnly', 'true');
   
   const queryString = params.toString();
   return queryString ? `?${queryString}` : '';
