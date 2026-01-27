@@ -84,17 +84,18 @@ Deno.serve(async (req) => {
       const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-      // Get all orders for calculations
+      // Get only PAID orders for metrics (paid_at is not null)
       const { data: orders, error } = await supabase
         .from("orders")
-        .select("total, fulfillment_stage, created_at");
+        .select("total, fulfillment_stage, paid_at")
+        .not("paid_at", "is", null);
 
       if (error) throw error;
 
       const metrics = {
-        todaySales: orders?.filter(o => o.created_at >= todayStart).reduce((sum, o) => sum + Number(o.total), 0) || 0,
-        weekSales: orders?.filter(o => o.created_at >= weekStart).reduce((sum, o) => sum + Number(o.total), 0) || 0,
-        monthSales: orders?.filter(o => o.created_at >= monthStart).reduce((sum, o) => sum + Number(o.total), 0) || 0,
+        todaySales: orders?.filter(o => o.paid_at >= todayStart).reduce((sum, o) => sum + Number(o.total), 0) || 0,
+        weekSales: orders?.filter(o => o.paid_at >= weekStart).reduce((sum, o) => sum + Number(o.total), 0) || 0,
+        monthSales: orders?.filter(o => o.paid_at >= monthStart).reduce((sum, o) => sum + Number(o.total), 0) || 0,
         pendingOrders: orders?.filter(o => o.fulfillment_stage === "new").length || 0,
         issueOrders: orders?.filter(o => o.fulfillment_stage === "issue").length || 0,
         readyToShip: orders?.filter(o => o.fulfillment_stage === "label").length || 0,
