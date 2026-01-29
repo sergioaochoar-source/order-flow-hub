@@ -96,8 +96,23 @@ export function ShippingRatesDialog({
     });
   };
 
+  const isCompleteWarehouseAddress = (addr?: ShippingRatesDialogProps['warehouseAddress']) => {
+    if (!addr) return false;
+    return Boolean(
+      addr.name?.trim() &&
+        addr.street1?.trim() &&
+        addr.city?.trim() &&
+        addr.state?.trim() &&
+        addr.zip?.trim() &&
+        addr.country?.trim()
+    );
+  };
+
   // Default warehouse address (should come from settings in production)
-  const defaultWarehouse = warehouseAddress || {
+  // If a saved warehouse exists but is incomplete, fall back to a known-good default.
+  const defaultWarehouse = isCompleteWarehouseAddress(warehouseAddress)
+    ? warehouseAddress!
+    : {
     name: 'Peptium Warehouse',
     street1: '123 Warehouse St',
     city: 'Los Angeles',
@@ -106,10 +121,15 @@ export function ShippingRatesDialog({
     country: 'US',
     phone: '',
     email: '',
-  };
+    };
 
   const handleGetRates = async () => {
     if (!order) return;
+
+    if (!isCompleteWarehouseAddress(defaultWarehouse)) {
+      setError('Configura una dirección de origen (Warehouse) completa en Settings antes de cotizar tarifas.');
+      return;
+    }
 
     setIsLoadingRates(true);
     setError(null);
@@ -358,6 +378,13 @@ export function ShippingRatesDialog({
               <div className="bg-destructive/10 text-destructive p-3 rounded-lg flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <p className="text-sm">{error}</p>
+              </div>
+            )}
+
+            {!isCompleteWarehouseAddress(warehouseAddress) && (
+              <div className="bg-muted/50 text-muted-foreground p-3 rounded-lg text-sm">
+                Nota: la dirección de origen (Warehouse) guardada está incompleta. Se está usando un origen por defecto
+                para poder cotizar.
               </div>
             )}
 
