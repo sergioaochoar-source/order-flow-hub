@@ -5,8 +5,10 @@ import {
   Truck,
   Settings,
   ChevronLeft,
-  Users
+  Users,
+  LogOut
 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { NavLink } from '@/components/NavLink';
 import {
   Sidebar,
@@ -32,6 +34,7 @@ const navigation = [
 
 export function AppSidebar() {
   const { toggleSidebar, state } = useSidebar();
+  const { signOut } = useAuth();
   const isCollapsed = state === 'collapsed';
 
   return (
@@ -93,6 +96,17 @@ export function AppSidebar() {
                 <Settings className="w-5 h-5 flex-shrink-0" />
                 {!isCollapsed && <span>Settings</span>}
               </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Cerrar sesión">
+              <button
+                onClick={() => signOut()}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-colors w-full"
+              >
+                <LogOut className="w-5 h-5 flex-shrink-0" />
+                {!isCollapsed && <span>Cerrar sesión</span>}
+              </button>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
