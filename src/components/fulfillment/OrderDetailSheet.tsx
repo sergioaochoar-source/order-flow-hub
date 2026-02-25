@@ -19,9 +19,12 @@ import {
 } from '@/components/ui/select';
 import { StatusBadge } from './StatusBadge';
 import { ShipConfirmDialog } from './ShipConfirmDialog';
+import { ShippingRatesDialog } from '@/components/shipping/ShippingRatesDialog';
 import { Order, FulfillmentStage, TrackingPayload } from '@/types/order';
 import { useAddTracking } from '@/hooks/useOrders';
 import { sendShippingConfirmation } from '@/lib/emailApi';
+import { getLabelPdfProxyUrl } from '@/lib/easypostApi';
+import { getWarehouseAddress } from '@/pages/Settings';
 import { 
   Package, 
   User, 
@@ -30,7 +33,8 @@ import {
   CheckCircle2,
   Truck,
   AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  Tag
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -61,6 +65,7 @@ export function OrderDetailSheet({
   // Confirmation dialog state
   const [showShipConfirm, setShowShipConfirm] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<TrackingPayload | null>(null);
+  const [isRatesDialogOpen, setIsRatesDialogOpen] = useState(false);
   
   // Use the tracking mutation directly
   const addTrackingMutation = useAddTracking();
@@ -81,6 +86,43 @@ export function OrderDetailSheet({
     };
     setPendingPayload(payload);
     setShowShipConfirm(true);
+  };
+
+  // Handle label purchased from EasyPost
+  const handleLabelPurchased = async (trackingNum: string, carrierName: string, labelUrl: string) => {
+    addTrackingMutation.mutate(
+      { 
+        orderId: order.id, 
+        payload: {
+          carrier: carrierName,
+          tracking: trackingNum,
+          shippedAt: new Date().toISOString(),
+          labelUrl,
+        }
+      },
+      {
+        onSuccess: () => {
+          const updatedOrder: Order = {
+            ...order,
+            fulfillmentStage: 'shipped',
+            shipment: {
+              carrier: carrierName,
+              trackingNumber: trackingNum,
+              shippedAt: new Date().toISOString(),
+              labelUrl,
+            },
+            updatedAt: new Date().toISOString(),
+          };
+          onUpdateOrder(updatedOrder);
+          toast.success(`Order ${order.orderNumber} marked as shipped!`);
+          setIsRatesDialogOpen(false);
+          // Open label PDF
+          const proxyUrl = getLabelPdfProxyUrl(labelUrl);
+          window.open(proxyUrl, '_blank');
+          onOpenChange(false);
+        }
+      }
+    );
   };
 
   const handleConfirmShipment = () => {
@@ -315,6 +357,22 @@ export function OrderDetailSheet({
                   </div>
                 ) : order.fulfillmentStage === 'label' ? (
                   <div className="space-y-3">
+                    {/* Buy Label via EasyPost */}
+                    <Button 
+                      onClick={() => setIsRatesDialogOpen(true)}
+                      className="w-full gap-2"
+                      variant="default"
+                    >
+                      <Tag className="w-4 h-4" />
+                      Buy Label
+                    </Button>
+
+                    <div className="relative flex items-center">
+                      <div className="flex-grow border-t border-border" />
+                      <span className="mx-3 text-xs text-muted-foreground">or enter manually</span>
+                      <div className="flex-grow border-t border-border" />
+                    </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="carrier">Carrier</Label>
                       <Select value={carrier} onValueChange={setCarrier}>
@@ -340,6 +398,7 @@ export function OrderDetailSheet({
                     <Button 
                       onClick={handleMarkShipped} 
                       className="w-full gap-2"
+                      variant="outline"
                       disabled={!carrier || !trackingNumber}
                     >
                       <CheckCircle2 className="w-4 h-4" />
@@ -395,7 +454,7 @@ export function OrderDetailSheet({
         </SheetContent>
       </Sheet>
 
-      {/* Ship Confirmation Dialog - embedded in sheet component */}
+      {/* Ship Confirmation Dialog */}
       <ShipConfirmDialog
         open={showShipConfirm}
         onOpenChange={(open) => {
@@ -407,6 +466,15 @@ export function OrderDetailSheet({
         trackingNumber={pendingPayload?.tracking || ''}
         onConfirm={handleConfirmShipment}
         isLoading={addTrackingMutation.isPending}
+      />
+
+      {/* EasyPost Rates Dialog */}
+      <ShippingRatesDialog
+        order={order}
+        open={isRatesDialogOpen}
+        onOpenChange={setIsRatesDialogOpen}
+        onLabelPurchased={handleLabelPurchased}
+        warehouseAddress={getWarehouseAddress()}
       />
     </>
   );
