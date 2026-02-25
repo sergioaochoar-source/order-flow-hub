@@ -265,23 +265,39 @@ serve(async (req) => {
         );
       }
 
-      // Fetch the PDF
-      const pdfResponse = await fetch(labelUrl);
+      // Fetch the label file
+      const labelResponse = await fetch(labelUrl);
       
-      if (!pdfResponse.ok) {
+      if (!labelResponse.ok) {
         return new Response(
-          JSON.stringify({ error: 'Failed to fetch label PDF' }),
-          { status: pdfResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: 'Failed to fetch label file' }),
+          { status: labelResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      const pdfBuffer = await pdfResponse.arrayBuffer();
+      const labelBuffer = await labelResponse.arrayBuffer();
       
-      return new Response(pdfBuffer, {
+      // Detect content type from URL extension or response header
+      const responseContentType = labelResponse.headers.get('content-type');
+      let contentType = responseContentType || 'application/pdf';
+      let filename = 'shipping-label.pdf';
+      
+      if (labelUrl.endsWith('.png') || contentType.includes('image/png')) {
+        contentType = 'image/png';
+        filename = 'shipping-label.png';
+      } else if (labelUrl.endsWith('.jpg') || labelUrl.endsWith('.jpeg') || contentType.includes('image/jpeg')) {
+        contentType = 'image/jpeg';
+        filename = 'shipping-label.jpg';
+      } else if (labelUrl.endsWith('.zpl') || contentType.includes('application/zpl')) {
+        contentType = 'application/octet-stream';
+        filename = 'shipping-label.zpl';
+      }
+      
+      return new Response(labelBuffer, {
         headers: {
           ...corsHeaders,
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': 'attachment; filename="shipping-label.pdf"',
+          'Content-Type': contentType,
+          'Content-Disposition': `inline; filename="${filename}"`,
         },
       });
     }
