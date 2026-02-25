@@ -355,7 +355,17 @@ export function OrderDetailSheet({
                       {order.shipment.carrier}: {order.shipment.trackingNumber}
                     </p>
                   </div>
-                ) : order.fulfillmentStage === 'label' ? (
+                ) : order.fulfillmentStage === 'label' && order.shipment ? (
+                  <div className="bg-primary/10 p-3 rounded-lg">
+                    <p className="text-sm font-medium text-primary">📋 Etiqueta comprada</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {order.shipment.carrier}: {order.shipment.trackingNumber}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Se moverá a Enviado automáticamente cuando el carrier escanee el paquete.
+                    </p>
+                  </div>
+                ) : (order.fulfillmentStage === 'new' || order.fulfillmentStage === 'label') ? (
                   <div className="space-y-3">
                     {/* Buy Label via EasyPost */}
                     <Button 
