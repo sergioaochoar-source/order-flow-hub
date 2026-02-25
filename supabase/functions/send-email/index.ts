@@ -163,7 +163,41 @@ function getStatusUpdateEmail(orderNumber: string, customerName: string, newStat
 }
 
 // Thank you for your order email (sent on payment)
-function getThankYouEmail(orderNumber: string, customerName: string, total: string, currency: string) {
+function getThankYouEmail(orderNumber: string, customerName: string, total: string, currency: string, items?: Array<{ name: string; quantity: number; price: number }>) {
+  const currencySymbol = currency === "MXN" ? "$" : currency === "USD" ? "$" : currency;
+  
+  const itemsHtml = items && items.length > 0 ? `
+    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+      <tr style="border-bottom: 2px solid #e5e7eb;">
+        <td style="padding: 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Product</td>
+        <td style="padding: 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; text-align: center;">Qty</td>
+        <td style="padding: 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; text-align: right;">Price</td>
+      </tr>
+      ${items.map(item => `
+      <tr style="border-bottom: 1px solid #f3f4f6;">
+        <td style="padding: 12px 0; font-size: 14px; color: ${BRAND_DARK};">${item.name}</td>
+        <td style="padding: 12px 0; font-size: 14px; color: ${BRAND_DARK}; text-align: center;">${item.quantity}</td>
+        <td style="padding: 12px 0; font-size: 14px; color: ${BRAND_DARK}; text-align: right;">${currencySymbol}${(item.price * item.quantity).toFixed(2)}</td>
+      </tr>
+      `).join('')}
+      <tr>
+        <td colspan="2" style="padding: 14px 0 8px; font-weight: 700; font-size: 15px; color: ${BRAND_DARK}; text-align: right;">Total:</td>
+        <td style="padding: 14px 0 8px; font-weight: 700; font-size: 15px; color: ${BRAND_ORANGE}; text-align: right;">${currencySymbol}${parseFloat(total).toFixed(2)} ${currency}</td>
+      </tr>
+    </table>
+  ` : `
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr>
+        <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Order Number:</td>
+        <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_ORANGE};">${orderNumber}</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 0; color: #6b7280; font-size: 14px; border-top: 1px solid #eee;">Total:</td>
+        <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_DARK}; border-top: 1px solid #eee;">${currencySymbol}${parseFloat(total).toFixed(2)} ${currency}</td>
+      </tr>
+    </table>
+  `;
+
   return {
     subject: `🎉 Thank you for your order #${orderNumber}!`,
     html: `
@@ -182,17 +216,8 @@ function getThankYouEmail(orderNumber: string, customerName: string, total: stri
           <p>Thank you for your purchase! We're thrilled to have you as a customer.</p>
           
           <div style="background: #fafafa; border: 1px solid #e5e7eb; border-left: 4px solid ${BRAND_ORANGE}; border-radius: 0 8px 8px 0; padding: 20px; margin: 25px 0;">
-            <h3 style="margin: 0 0 15px 0; color: ${BRAND_DARK}; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Order Details</h3>
-            <table style="width: 100%; border-collapse: collapse;">
-              <tr>
-                <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Order Number:</td>
-                <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_ORANGE};">${orderNumber}</td>
-              </tr>
-              <tr>
-                <td style="padding: 10px 0; color: #6b7280; font-size: 14px; border-top: 1px solid #eee;">Total:</td>
-                <td style="padding: 10px 0; font-weight: 600; color: ${BRAND_DARK}; border-top: 1px solid #eee;">${currency} ${total}</td>
-              </tr>
-            </table>
+            <h3 style="margin: 0 0 5px 0; color: ${BRAND_DARK}; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Order #${orderNumber}</h3>
+            ${itemsHtml}
           </div>
           
           <p>Your order has been received and is now being processed. We'll send you another email with tracking information once your order ships.</p>
@@ -375,13 +400,13 @@ app.post("/status-update", async (c) => {
 app.post("/thank-you", async (c) => {
   try {
     const body = await c.req.json();
-    const { to, orderNumber, customerName, total, currency } = body;
+    const { to, orderNumber, customerName, total, currency, items } = body;
 
     if (!to || !orderNumber) {
       return c.json({ error: "Missing required fields: to, orderNumber" }, 400, corsHeaders);
     }
 
-    const emailContent = getThankYouEmail(orderNumber, customerName, total || "0.00", currency || "USD");
+    const emailContent = getThankYouEmail(orderNumber, customerName, total || "0.00", currency || "USD", items);
 
     const result = await sendEmail(to, emailContent.subject, emailContent.html);
 
