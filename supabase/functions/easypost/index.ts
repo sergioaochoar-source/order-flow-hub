@@ -256,7 +256,9 @@ serve(async (req) => {
       }
 
       // Validate URL is from EasyPost
-      if (!labelUrl.includes('easypost.com') && !labelUrl.includes('easypostfiles.com')) {
+      const allowedDomains = ['easypost.com', 'easypostfiles.com', 'easypost-files.s3.us-west-2.amazonaws.com'];
+      const isAllowed = allowedDomains.some(domain => labelUrl.includes(domain));
+      if (!isAllowed) {
         return new Response(
           JSON.stringify({ error: 'Invalid label URL' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
