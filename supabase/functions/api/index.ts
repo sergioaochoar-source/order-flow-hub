@@ -545,6 +545,11 @@ Deno.serve(async (req) => {
       if (paid_at && customer_email) {
         try {
           const emailUrl = `${supabaseUrl}/functions/v1/send-email/thank-you`;
+          const emailItems = items && Array.isArray(items) ? items.map((item: any) => ({
+            name: item.name || "Item",
+            quantity: item.quantity || 1,
+            price: item.price || 0,
+          })) : [];
           await fetch(emailUrl, {
             method: "POST",
             headers: {
@@ -557,6 +562,7 @@ Deno.serve(async (req) => {
               customerName: customer_name,
               total: String(total || 0),
               currency: currency || "USD",
+              items: emailItems,
             }),
           });
           console.log(`[Storefront] Thank you email sent to ${customer_email} for order ${order_number}`);
@@ -735,6 +741,11 @@ Deno.serve(async (req) => {
       if (isNewOrder && isPaid && customerEmail) {
         try {
           const emailUrl = `${supabaseUrl}/functions/v1/send-email/thank-you`;
+          const emailItems = wcOrder.line_items && Array.isArray(wcOrder.line_items) ? wcOrder.line_items.map((item: any) => ({
+            name: item.name || "Item",
+            quantity: item.quantity || 1,
+            price: parseFloat(String(item.price)) || 0,
+          })) : [];
           await fetch(emailUrl, {
             method: "POST",
             headers: {
@@ -747,6 +758,7 @@ Deno.serve(async (req) => {
               customerName: customerName,
               total: String(parseFloat(wcOrder.total) || 0),
               currency: wcOrder.currency || "USD",
+              items: emailItems,
             }),
           });
           console.log(`[WooCommerce Webhook] Thank you email sent to ${customerEmail}`);
