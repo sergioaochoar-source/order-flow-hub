@@ -104,7 +104,7 @@ export function OrderDetailSheet({
         onSuccess: () => {
           const updatedOrder: Order = {
             ...order,
-            fulfillmentStage: 'shipped',
+            fulfillmentStage: 'label',
             shipment: {
               carrier: carrierName,
               trackingNumber: trackingNum,
@@ -114,7 +114,7 @@ export function OrderDetailSheet({
             updatedAt: new Date().toISOString(),
           };
           onUpdateOrder(updatedOrder);
-          toast.success(`Order ${order.orderNumber} marked as shipped!`);
+          toast.success(`Etiqueta comprada para ${order.orderNumber}. Se moverá a Enviado cuando el carrier escanee.`);
           setIsRatesDialogOpen(false);
           // Open label PDF
           const proxyUrl = getLabelPdfProxyUrl(labelUrl);
