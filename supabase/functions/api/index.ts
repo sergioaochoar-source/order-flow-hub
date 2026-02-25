@@ -541,6 +541,30 @@ Deno.serve(async (req) => {
         message: `Order received from ${source || "storefront"}`,
       });
 
+      // Send thank you email if order is paid
+      if (paid_at && customer_email) {
+        try {
+          const emailUrl = `${supabaseUrl}/functions/v1/send-email/thank-you`;
+          await fetch(emailUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${supabaseKey}`,
+            },
+            body: JSON.stringify({
+              to: customer_email,
+              orderNumber: order_number,
+              customerName: customer_name,
+              total: String(total || 0),
+              currency: currency || "USD",
+            }),
+          });
+          console.log(`[Storefront] Thank you email sent to ${customer_email} for order ${order_number}`);
+        } catch (emailError) {
+          console.error("[Storefront] Failed to send thank you email:", emailError);
+        }
+      }
+
       return new Response(JSON.stringify({ ok: true, id: newOrder.id }), {
         status: 201,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
