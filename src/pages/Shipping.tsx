@@ -69,7 +69,7 @@ export default function Shipping() {
       },
       {
         onSuccess: () => {
-          toast.success(`Order ${selectedOrder.orderNumber} marked as shipped!`);
+          toast.success(`Etiqueta comprada para ${selectedOrder.orderNumber}. Se moverá a Enviado cuando el carrier escanee.`);
           setIsRatesDialogOpen(false);
           setSelectedOrder(null);
           // Open label PDF via proxy

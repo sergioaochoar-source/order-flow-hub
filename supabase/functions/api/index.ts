@@ -403,8 +403,8 @@ Deno.serve(async (req) => {
 
       if (shipmentError) throw shipmentError;
 
-      // Update order stage and optionally status
-      const updateData: Record<string, string> = { fulfillment_stage: "shipped" };
+      // Update order stage to "label" (will auto-transition to "shipped" when carrier scans)
+      const updateData: Record<string, string> = { fulfillment_stage: "label" };
       if (orderStatus) {
         updateData.status = orderStatus;
       }

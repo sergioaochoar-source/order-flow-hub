@@ -193,6 +193,36 @@ Deno.serve(async (req) => {
       console.log(`[Webhook] Updated shipment for order ${shipment.order_id}: ${status}`);
     }
 
+    // Auto-transition: when carrier scans package (in_transit or later), move to "shipped"
+    const SHIPPED_STATUSES = ["in_transit", "out_for_delivery", "delivered", "available_for_pickup"];
+    if (SHIPPED_STATUSES.includes(status)) {
+      // Check current stage - only auto-advance from "label" to "shipped"
+      const { data: currentOrder } = await supabase
+        .from("orders")
+        .select("fulfillment_stage")
+        .eq("id", shipment.order_id)
+        .single();
+
+      if (currentOrder && currentOrder.fulfillment_stage === "label") {
+        const { error: stageErr } = await supabase
+          .from("orders")
+          .update({ fulfillment_stage: "shipped", updated_at: new Date().toISOString() })
+          .eq("id", shipment.order_id);
+
+        if (stageErr) {
+          console.error("[Webhook] Error auto-transitioning to shipped:", stageErr);
+        } else {
+          console.log(`[Webhook] Auto-transitioned order ${shipment.order_id} to shipped`);
+          await supabase.from("order_events").insert({
+            order_id: shipment.order_id,
+            type: "fulfillment_change",
+            message: `Auto-transitioned to shipped: carrier scanned (${STATUS_LABELS[status] || status})`,
+            meta: { from_stage: "label", to_stage: "shipped", trigger: status },
+          });
+        }
+      }
+    }
+
     // If delivered, update order status and send email
     if (status === "delivered") {
       const { error: orderErr } = await supabase
