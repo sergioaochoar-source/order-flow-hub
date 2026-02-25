@@ -474,6 +474,79 @@ Deno.serve(async (req) => {
       });
     }
 
+    // POST /api/orders (storefront ingestion)
+    if (path === "orders" && req.method === "POST") {
+      const body = await req.json();
+      const { order_number, customer_name, customer_email, total, currency, shipping_address, items, paid_at, source, storefront_order_id } = body;
+
+      // Validate required fields
+      if (!order_number || !customer_name || !customer_email) {
+        return new Response(JSON.stringify({ error: "order_number, customer_name and customer_email are required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Check for duplicate
+      const { data: existing } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("order_number", order_number)
+        .maybeSingle();
+
+      if (existing) {
+        return new Response(JSON.stringify({ ok: true, id: existing.id, message: "Order already exists" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Insert order
+      const { data: newOrder, error: insertError } = await supabase
+        .from("orders")
+        .insert({
+          order_number,
+          customer_name,
+          customer_email,
+          total: total || 0,
+          currency: currency || "USD",
+          shipping_address: shipping_address || null,
+          status: "processing",
+          fulfillment_stage: "new",
+          paid_at: paid_at || null,
+          wc_order_id: storefront_order_id || null,
+        })
+        .select("id")
+        .single();
+
+      if (insertError) throw insertError;
+
+      // Insert items
+      if (items && Array.isArray(items) && items.length > 0) {
+        const orderItems = items.map((item: any) => ({
+          order_id: newOrder.id,
+          sku: item.sku || null,
+          name: item.name || "Item",
+          quantity: item.quantity || 1,
+          price: item.price || 0,
+        }));
+
+        const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
+        if (itemsError) throw itemsError;
+      }
+
+      // Create event
+      await supabase.from("order_events").insert({
+        order_id: newOrder.id,
+        type: "created",
+        message: `Order received from ${source || "storefront"}`,
+      });
+
+      return new Response(JSON.stringify({ ok: true, id: newOrder.id }), {
+        status: 201,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // POST /api/webhooks/woocommerce
     if (path === "webhooks/woocommerce" && req.method === "POST") {
       const signature = req.headers.get("X-WC-Webhook-Signature");
