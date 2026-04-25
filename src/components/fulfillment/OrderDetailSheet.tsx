@@ -80,17 +80,17 @@ export function OrderDetailSheet({
       return;
     }
 
-    // Prepare tracking payload and show confirmation dialog
     const payload: TrackingPayload = {
       carrier,
       tracking: trackingNumber,
       shippedAt: new Date().toISOString(),
+      markShipped: true,
     };
     setPendingPayload(payload);
     setShowShipConfirm(true);
   };
 
-  // Handle label purchased from EasyPost
+  // Label purchased via EasyPost — order goes to "label" (no auto-ship)
   const handleLabelPurchased = async (trackingNum: string, carrierName: string, labelUrl: string) => {
     addTrackingMutation.mutate(
       { 
@@ -100,6 +100,7 @@ export function OrderDetailSheet({
           tracking: trackingNum,
           shippedAt: new Date().toISOString(),
           labelUrl,
+          markShipped: false,
         }
       },
       {
@@ -116,9 +117,8 @@ export function OrderDetailSheet({
             updatedAt: new Date().toISOString(),
           };
           onUpdateOrder(updatedOrder);
-          toast.success(`Etiqueta comprada para ${order.orderNumber}. Se moverá a Enviado cuando el carrier escanee.`);
+          toast.success(`Etiqueta comprada para ${order.orderNumber}. Marca como Enviado cuando despaches el paquete.`);
           setIsRatesDialogOpen(false);
-          // Open label PDF
           const proxyUrl = getLabelPdfProxyUrl(labelUrl);
           window.open(proxyUrl, '_blank');
           onOpenChange(false);
@@ -133,11 +133,10 @@ export function OrderDetailSheet({
     addTrackingMutation.mutate(
       {
         orderId: order.id,
-        payload: pendingPayload,
+        payload: { ...pendingPayload, markShipped: true },
       },
       {
         onSuccess: async () => {
-          // Update local state for immediate feedback
           const updatedOrder: Order = {
             ...order,
             fulfillmentStage: 'shipped',
@@ -151,7 +150,6 @@ export function OrderDetailSheet({
           };
           onUpdateOrder(updatedOrder);
           
-          // Send shipping confirmation email
           if (order.customer.email) {
             try {
               await sendShippingConfirmation({
@@ -168,7 +166,6 @@ export function OrderDetailSheet({
             }
           }
           
-          // Reset state
           setShowShipConfirm(false);
           setPendingPayload(null);
           setTrackingNumber('');
@@ -182,16 +179,16 @@ export function OrderDetailSheet({
     );
   };
 
-  // Handle "Move to Enviado" from the workflow button (label → shipped)
+  // "Move to Enviado" button → prompts for tracking → ships
   const handleShipWithTrackingConfirm = (carrierName: string, trackingNum: string) => {
     const payload: TrackingPayload = {
       carrier: carrierName,
       tracking: trackingNum,
       shippedAt: new Date().toISOString(),
+      markShipped: true,
     };
     setPendingPayload(payload);
     setShowShipWithTracking(false);
-    // Reuse existing confirmation flow which saves tracking + sends email
     setShowShipConfirm(true);
   };
 
