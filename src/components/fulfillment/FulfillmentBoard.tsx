@@ -9,7 +9,7 @@ import { EmptyOrdersState } from '@/components/EmptyOrdersState';
 import { isValidTransition } from '@/lib/fulfillmentRules';
 import { toast } from 'sonner';
 
-const stages: FulfillmentStage[] = ['new', 'label', 'shipped', 'issue'];
+const stages: FulfillmentStage[] = ['new', 'label', 'shipped', 'delivered', 'issue'];
 
 export function FulfillmentBoard() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -23,6 +23,7 @@ export function FulfillmentBoard() {
       new: [],
       label: [],
       shipped: [],
+      delivered: [],
       issue: [],
     };
     

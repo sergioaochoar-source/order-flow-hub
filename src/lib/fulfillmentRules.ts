@@ -1,9 +1,8 @@
 import { FulfillmentStage, Order } from '@/types/order';
 
-// Define the valid stage order (simplified: New → Label → Shipped)
-const STAGE_ORDER: FulfillmentStage[] = ['new', 'label', 'shipped'];
+// Linear flow: New → Label → Shipped → Delivered
+const STAGE_ORDER: FulfillmentStage[] = ['new', 'label', 'shipped', 'delivered'];
 
-// Get the index of a stage in the flow
 function getStageIndex(stage: FulfillmentStage): number {
   return STAGE_ORDER.indexOf(stage);
 }
@@ -14,58 +13,72 @@ export function isValidTransition(
   fromStage: FulfillmentStage,
   toStage: FulfillmentStage
 ): { valid: boolean; message?: string } {
-  // Issue is special - can move TO issue from anywhere
+  // Issue is special - can move TO issue from anywhere except delivered
   if (toStage === 'issue') {
+    if (fromStage === 'delivered') {
+      return { valid: false, message: 'No se puede marcar como Problema una orden ya entregada.' };
+    }
     return { valid: true };
   }
 
-  // From Issue, allow moving back to any stage except shipped (requires tracking)
+  // From Issue, allow moving back to new or label (must re-add tracking for shipped)
   if (fromStage === 'issue') {
     const allowedFromIssue: FulfillmentStage[] = ['new', 'label'];
     if (allowedFromIssue.includes(toStage)) {
       return { valid: true };
     }
-    // Cannot go directly from issue to shipped
     if (toStage === 'shipped') {
       return {
         valid: false,
         message: 'No se puede enviar directamente desde Issue. Mueve a Label primero y añade tracking.',
       };
     }
+    if (toStage === 'delivered') {
+      return { valid: false, message: 'No se puede marcar como Entregado desde Issue.' };
+    }
   }
 
-  // Cannot skip to Shipped - must have tracking
+  // Cannot enter Shipped without tracking
   if (toStage === 'shipped') {
     if (!order.shipment?.trackingNumber) {
       return {
         valid: false,
-        message: 'No se puede marcar como Enviado sin información de tracking. Añade el tracking primero.',
+        message: 'No se puede marcar como Enviado sin tracking number. Añade el tracking primero.',
       };
     }
-    // Shipped can only come from Label stage
     if (fromStage !== 'label') {
       return {
         valid: false,
-        message: 'Las órdenes deben estar en Label antes de enviar.',
+        message: 'Las órdenes deben estar en Etiquetado antes de Enviado.',
       };
     }
     return { valid: true };
+  }
+
+  // Cannot enter Delivered manually unless coming from Shipped
+  if (toStage === 'delivered') {
+    if (fromStage !== 'shipped') {
+      return {
+        valid: false,
+        message: 'Solo se puede marcar como Entregado desde Enviado.',
+      };
+    }
+    return { valid: true };
+  }
+
+  // From Delivered: terminal stage, no manual transitions
+  if (fromStage === 'delivered') {
+    return { valid: false, message: 'Las órdenes entregadas son finales y no se pueden mover.' };
   }
 
   const fromIndex = getStageIndex(fromStage);
   const toIndex = getStageIndex(toStage);
 
-  // Allow moving forward by one step
-  if (toIndex === fromIndex + 1) {
-    return { valid: true };
-  }
+  // Forward by one
+  if (toIndex === fromIndex + 1) return { valid: true };
+  // Backward (corrections)
+  if (toIndex < fromIndex) return { valid: true };
 
-  // Allow moving backward (for corrections)
-  if (toIndex < fromIndex) {
-    return { valid: true };
-  }
-
-  // Skipping stages is not allowed
   if (toIndex > fromIndex + 1) {
     const expectedNext = STAGE_ORDER[fromIndex + 1];
     return {
@@ -83,51 +96,48 @@ export function getAvailableTransitions(order: Order): FulfillmentStage[] {
   const currentIndex = getStageIndex(currentStage);
   const available: FulfillmentStage[] = [];
 
-  // From Issue, can go back to any prior stage
   if (currentStage === 'issue') {
     return ['new', 'label'];
   }
 
-  // Already shipped - no transitions
-  if (currentStage === 'shipped') {
-    return ['issue']; // Can only mark as issue
+  // Delivered = terminal
+  if (currentStage === 'delivered') {
+    return [];
   }
 
-  // Next stage (if not at the end)
+  // Shipped → can advance to delivered manually, or back to issue
+  if (currentStage === 'shipped') {
+    return ['delivered', 'issue'];
+  }
+
   if (currentIndex < STAGE_ORDER.length - 1) {
     const nextStage = STAGE_ORDER[currentIndex + 1];
-    
-    // Special case: can't go to shipped without tracking
     if (nextStage === 'shipped' && !order.shipment?.trackingNumber) {
-      // Don't add shipped as available
+      // skip — needs tracking
     } else {
       available.push(nextStage);
     }
   }
 
-  // Previous stage (for corrections)
   if (currentIndex > 0) {
     available.push(STAGE_ORDER[currentIndex - 1]);
   }
 
-  // Can always mark as issue
   available.push('issue');
-
   return available;
 }
 
-// Get stage display name
 export function getStageName(stage: FulfillmentStage): string {
   const names: Record<FulfillmentStage, string> = {
     new: 'Nuevo',
     label: 'Etiquetado',
     shipped: 'Enviado',
+    delivered: 'Entregado',
     issue: 'Problema',
   };
   return names[stage];
 }
 
-// Check if order requires tracking before shipping
 export function requiresTrackingForShip(order: Order): boolean {
   return order.fulfillmentStage === 'label' && !order.shipment?.trackingNumber;
 }
