@@ -154,6 +154,12 @@ export interface TrackingPayload {
   service?: string;
   shippedAt?: string;
   labelUrl?: string;
+  /**
+   * If true, transition order directly to "shipped" stage and trigger
+   * shipping confirmation email. If false (default), tracking is just
+   * added (typically used after buying a label, leaves order in "label").
+   */
+  markShipped?: boolean;
 }
 
 // ============ API Config ============

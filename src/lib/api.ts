@@ -243,7 +243,9 @@ export async function addOrderTracking(
       tracking: payload.tracking,
       service: payload.service,
       shippedAt: payload.shippedAt,
+      labelUrl: payload.labelUrl,
       orderStatus: shippedStatus,
+      markShipped: payload.markShipped === true,
     }),
   });
   return normalizeOrder(rawOrder);
