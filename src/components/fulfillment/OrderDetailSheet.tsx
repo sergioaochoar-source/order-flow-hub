@@ -67,6 +67,7 @@ export function OrderDetailSheet({
   const [showShipConfirm, setShowShipConfirm] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<TrackingPayload | null>(null);
   const [isRatesDialogOpen, setIsRatesDialogOpen] = useState(false);
+  const [showShipWithTracking, setShowShipWithTracking] = useState(false);
   
   // Use the tracking mutation directly
   const addTrackingMutation = useAddTracking();
