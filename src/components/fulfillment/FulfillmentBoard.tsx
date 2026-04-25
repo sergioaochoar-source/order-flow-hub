@@ -45,6 +45,16 @@ export function FulfillmentBoard() {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
 
+    // Special case: moving to "shipped" should always go through the
+    // tracking-prompt flow inside OrderDetailSheet, so the user can
+    // enter the tracking number and trigger the shipping email.
+    if (newStage === 'shipped' && order.fulfillmentStage !== 'shipped') {
+      setSelectedOrder(order);
+      setIsSheetOpen(true);
+      toast.info('Ingresa el tracking number para marcar como Enviado');
+      return;
+    }
+
     // Validate the transition
     const validation = isValidTransition(order, order.fulfillmentStage, newStage);
     if (!validation.valid) {

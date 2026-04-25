@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { StatusBadge } from './StatusBadge';
 import { ShipConfirmDialog } from './ShipConfirmDialog';
+import { ShipWithTrackingDialog } from './ShipWithTrackingDialog';
 import { ShippingRatesDialog } from '@/components/shipping/ShippingRatesDialog';
 import { Order, FulfillmentStage, TrackingPayload } from '@/types/order';
 import { useAddTracking } from '@/hooks/useOrders';
@@ -66,6 +67,7 @@ export function OrderDetailSheet({
   const [showShipConfirm, setShowShipConfirm] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<TrackingPayload | null>(null);
   const [isRatesDialogOpen, setIsRatesDialogOpen] = useState(false);
+  const [showShipWithTracking, setShowShipWithTracking] = useState(false);
   
   // Use the tracking mutation directly
   const addTrackingMutation = useAddTracking();
@@ -180,11 +182,29 @@ export function OrderDetailSheet({
     );
   };
 
+  // Handle "Move to Enviado" from the workflow button (label → shipped)
+  const handleShipWithTrackingConfirm = (carrierName: string, trackingNum: string) => {
+    const payload: TrackingPayload = {
+      carrier: carrierName,
+      tracking: trackingNum,
+      shippedAt: new Date().toISOString(),
+    };
+    setPendingPayload(payload);
+    setShowShipWithTracking(false);
+    // Reuse existing confirmation flow which saves tracking + sends email
+    setShowShipConfirm(true);
+  };
+
   // Get available transitions based on fulfillment rules
   const availableTransitions = getAvailableTransitions(order);
   const nextStage = availableTransitions.find(s => s !== 'issue' && s !== order.fulfillmentStage);
 
   const handleStageTransition = (newStage: FulfillmentStage) => {
+    // Special case: moving to "shipped" should always prompt for tracking
+    if (newStage === 'shipped') {
+      setShowShipWithTracking(true);
+      return;
+    }
     const validation = isValidTransition(order, order.fulfillmentStage, newStage);
     if (!validation.valid) {
       toast.error(validation.message || 'Invalid transition');
@@ -217,7 +237,12 @@ export function OrderDetailSheet({
                 <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded-lg">
                   <span>Current:</span>
                   <StatusBadge status={order.fulfillmentStage} size="sm" />
-                  {nextStage && (
+                  {order.fulfillmentStage === 'label' ? (
+                    <>
+                      <ArrowRight className="w-4 h-4" />
+                      <span className="font-medium text-foreground">{getStageName('shipped')}</span>
+                    </>
+                  ) : nextStage && (
                     <>
                       <ArrowRight className="w-4 h-4" />
                       <span className="font-medium text-foreground">{getStageName(nextStage)}</span>
@@ -226,7 +251,7 @@ export function OrderDetailSheet({
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {/* Next stage button */}
+                  {/* Next stage button (non-shipped transitions) */}
                   {nextStage && nextStage !== 'shipped' && (
                     <Button 
                       onClick={() => handleStageTransition(nextStage)}
@@ -234,6 +259,17 @@ export function OrderDetailSheet({
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       Move to {getStageName(nextStage)}
+                    </Button>
+                  )}
+
+                  {/* Move to Enviado: only available from "label" stage, prompts for tracking */}
+                  {order.fulfillmentStage === 'label' && (
+                    <Button
+                      onClick={() => handleStageTransition('shipped')}
+                      className="gap-2"
+                    >
+                      <Truck className="w-4 h-4" />
+                      Move to {getStageName('shipped')}
                     </Button>
                   )}
                   
@@ -475,6 +511,17 @@ export function OrderDetailSheet({
         carrier={pendingPayload?.carrier || ''}
         trackingNumber={pendingPayload?.tracking || ''}
         onConfirm={handleConfirmShipment}
+        isLoading={addTrackingMutation.isPending}
+      />
+
+      {/* Ship With Tracking Dialog (label → shipped) */}
+      <ShipWithTrackingDialog
+        open={showShipWithTracking}
+        onOpenChange={setShowShipWithTracking}
+        orderNumber={order.orderNumber}
+        defaultCarrier={order.shipment?.carrier || ''}
+        defaultTracking={order.shipment?.trackingNumber || ''}
+        onConfirm={handleShipWithTrackingConfirm}
         isLoading={addTrackingMutation.isPending}
       />
 
