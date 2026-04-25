@@ -20,6 +20,7 @@ import {
 import { StatusBadge } from './StatusBadge';
 import { ShipConfirmDialog } from './ShipConfirmDialog';
 import { ShipWithTrackingDialog } from './ShipWithTrackingDialog';
+import { DeliveredInfo } from './DeliveredInfo';
 import { ShippingRatesDialog } from '@/components/shipping/ShippingRatesDialog';
 import { Order, FulfillmentStage, TrackingPayload } from '@/types/order';
 import { useAddTracking } from '@/hooks/useOrders';
