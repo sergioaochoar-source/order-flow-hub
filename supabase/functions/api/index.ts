@@ -385,7 +385,7 @@ Deno.serve(async (req) => {
     if (pathParts[0] === "orders" && pathParts[2] === "tracking" && req.method === "POST") {
       const orderId = pathParts[1];
       const body = await req.json();
-      const { carrier, tracking, service, shippedAt, orderStatus, labelUrl } = body;
+      const { carrier, tracking, service, shippedAt, orderStatus, labelUrl, markShipped } = body;
 
       if (!carrier || !tracking) {
         return new Response(JSON.stringify({ error: "carrier and tracking are required" }), {
@@ -427,8 +427,11 @@ Deno.serve(async (req) => {
 
       if (shipmentError) throw shipmentError;
 
-      // Update order stage to "label" (will auto-transition to "shipped" when carrier scans)
-      const updateData: Record<string, string> = { fulfillment_stage: "label" };
+      // Stage transition:
+      //  - markShipped=true → directly to "shipped" (manual ship action with tracking)
+      //  - otherwise → "label" (e.g. label purchased, tracking only)
+      const targetStage = markShipped ? "shipped" : "label";
+      const updateData: Record<string, string> = { fulfillment_stage: targetStage };
       if (orderStatus) {
         updateData.status = orderStatus;
       }
@@ -443,9 +446,11 @@ Deno.serve(async (req) => {
       // Create event
       await supabase.from("order_events").insert({
         order_id: orderId,
-        type: "tracking_added",
-        message: `Tracking added: ${carrier} ${tracking}`,
-        meta: { carrier, tracking, service, labelUrl },
+        type: markShipped ? "fulfillment_change" : "tracking_added",
+        message: markShipped
+          ? `Marked as shipped with tracking ${carrier} ${tracking}`
+          : `Tracking added: ${carrier} ${tracking}`,
+        meta: { carrier, tracking, service, labelUrl, markShipped: !!markShipped },
       });
 
       // Return updated order
