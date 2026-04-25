@@ -237,7 +237,12 @@ export function OrderDetailSheet({
                 <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded-lg">
                   <span>Current:</span>
                   <StatusBadge status={order.fulfillmentStage} size="sm" />
-                  {nextStage && (
+                  {order.fulfillmentStage === 'label' ? (
+                    <>
+                      <ArrowRight className="w-4 h-4" />
+                      <span className="font-medium text-foreground">{getStageName('shipped')}</span>
+                    </>
+                  ) : nextStage && (
                     <>
                       <ArrowRight className="w-4 h-4" />
                       <span className="font-medium text-foreground">{getStageName(nextStage)}</span>
@@ -246,7 +251,7 @@ export function OrderDetailSheet({
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {/* Next stage button */}
+                  {/* Next stage button (non-shipped transitions) */}
                   {nextStage && nextStage !== 'shipped' && (
                     <Button 
                       onClick={() => handleStageTransition(nextStage)}
@@ -254,6 +259,17 @@ export function OrderDetailSheet({
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       Move to {getStageName(nextStage)}
+                    </Button>
+                  )}
+
+                  {/* Move to Enviado: only available from "label" stage, prompts for tracking */}
+                  {order.fulfillmentStage === 'label' && (
+                    <Button
+                      onClick={() => handleStageTransition('shipped')}
+                      className="gap-2"
+                    >
+                      <Truck className="w-4 h-4" />
+                      Move to {getStageName('shipped')}
                     </Button>
                   )}
                   
