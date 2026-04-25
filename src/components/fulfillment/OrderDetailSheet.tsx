@@ -182,11 +182,29 @@ export function OrderDetailSheet({
     );
   };
 
+  // Handle "Move to Enviado" from the workflow button (label → shipped)
+  const handleShipWithTrackingConfirm = (carrierName: string, trackingNum: string) => {
+    const payload: TrackingPayload = {
+      carrier: carrierName,
+      tracking: trackingNum,
+      shippedAt: new Date().toISOString(),
+    };
+    setPendingPayload(payload);
+    setShowShipWithTracking(false);
+    // Reuse existing confirmation flow which saves tracking + sends email
+    setShowShipConfirm(true);
+  };
+
   // Get available transitions based on fulfillment rules
   const availableTransitions = getAvailableTransitions(order);
   const nextStage = availableTransitions.find(s => s !== 'issue' && s !== order.fulfillmentStage);
 
   const handleStageTransition = (newStage: FulfillmentStage) => {
+    // Special case: moving to "shipped" should always prompt for tracking
+    if (newStage === 'shipped') {
+      setShowShipWithTracking(true);
+      return;
+    }
     const validation = isValidTransition(order, order.fulfillmentStage, newStage);
     if (!validation.valid) {
       toast.error(validation.message || 'Invalid transition');
