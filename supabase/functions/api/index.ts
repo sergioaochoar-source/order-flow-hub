@@ -187,7 +187,11 @@ Deno.serve(async (req) => {
           trackingNumber: shipmentsResult.data.find(s => s.order_id === order.id)!.tracking_number,
           service: shipmentsResult.data.find(s => s.order_id === order.id)!.service,
           shippedAt: shipmentsResult.data.find(s => s.order_id === order.id)!.shipped_at,
+          estimatedDelivery: shipmentsResult.data.find(s => s.order_id === order.id)!.estimated_delivery,
           labelUrl: shipmentsResult.data.find(s => s.order_id === order.id)!.label_url,
+          trackingStatus: shipmentsResult.data.find(s => s.order_id === order.id)!.tracking_status,
+          trackingDetails: shipmentsResult.data.find(s => s.order_id === order.id)!.tracking_details,
+          deliveredAt: shipmentsResult.data.find(s => s.order_id === order.id)!.delivered_at,
         } : undefined,
         notes: order.notes,
         events: eventsResult.data?.filter(e => e.order_id === order.id).map(e => ({
