@@ -381,21 +381,28 @@ export function OrderDetailSheet({
                   <span className="font-medium">{order.shippingMethod}</span>
                 </p>
 
-                {order.fulfillmentStage === 'shipped' && order.shipment ? (
+                {order.fulfillmentStage === 'delivered' && order.shipment ? (
+                  <DeliveredInfo shipment={order.shipment} />
+                ) : order.fulfillmentStage === 'shipped' && order.shipment ? (
                   <div className="bg-success/10 p-3 rounded-lg">
                     <p className="text-sm font-medium text-success">✓ Shipped</p>
                     <p className="text-sm text-muted-foreground mt-1">
                       {order.shipment.carrier}: {order.shipment.trackingNumber}
                     </p>
+                    {order.shipment.shippedAt && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Despachado: {format(new Date(order.shipment.shippedAt), 'PPp')}
+                      </p>
+                    )}
                   </div>
                 ) : order.fulfillmentStage === 'label' && order.shipment ? (
                   <div className="bg-primary/10 p-3 rounded-lg">
-                    <p className="text-sm font-medium text-primary">📋 Etiqueta comprada</p>
+                    <p className="text-sm font-medium text-primary">📋 Etiqueta lista</p>
                     <p className="text-sm text-muted-foreground mt-1">
                       {order.shipment.carrier}: {order.shipment.trackingNumber}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Se moverá a Enviado automáticamente cuando el carrier escanee el paquete.
+                      Marca como Enviado cuando despaches el paquete con el carrier.
                     </p>
                   </div>
                 ) : (order.fulfillmentStage === 'new' || order.fulfillmentStage === 'label') ? (
