@@ -514,6 +514,17 @@ export function OrderDetailSheet({
         isLoading={addTrackingMutation.isPending}
       />
 
+      {/* Ship With Tracking Dialog (label → shipped) */}
+      <ShipWithTrackingDialog
+        open={showShipWithTracking}
+        onOpenChange={setShowShipWithTracking}
+        orderNumber={order.orderNumber}
+        defaultCarrier={order.shipment?.carrier || ''}
+        defaultTracking={order.shipment?.trackingNumber || ''}
+        onConfirm={handleShipWithTrackingConfirm}
+        isLoading={addTrackingMutation.isPending}
+      />
+
       {/* EasyPost Rates Dialog */}
       <ShippingRatesDialog
         order={order}
