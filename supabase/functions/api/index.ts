@@ -477,7 +477,11 @@ Deno.serve(async (req) => {
           trackingNumber: shipment.tracking_number,
           service: shipment.service,
           shippedAt: shipment.shipped_at,
+          estimatedDelivery: shipment.estimated_delivery,
           labelUrl: shipment.label_url,
+          trackingStatus: shipment.tracking_status,
+          trackingDetails: shipment.tracking_details,
+          deliveredAt: shipment.delivered_at,
         },
         updatedAt: updatedOrder.updated_at,
       }), {
