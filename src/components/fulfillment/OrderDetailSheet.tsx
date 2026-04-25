@@ -227,7 +227,7 @@ export function OrderDetailSheet({
 
           <div className="space-y-6">
             {/* Quick Actions - Workflow */}
-            {order.fulfillmentStage !== 'shipped' && (
+            {order.fulfillmentStage !== 'delivered' && (
               <div className="space-y-3">
                 <h4 className="font-semibold text-sm text-foreground">Workflow Actions</h4>
                 
@@ -240,6 +240,11 @@ export function OrderDetailSheet({
                       <ArrowRight className="w-4 h-4" />
                       <span className="font-medium text-foreground">{getStageName('shipped')}</span>
                     </>
+                  ) : order.fulfillmentStage === 'shipped' ? (
+                    <>
+                      <ArrowRight className="w-4 h-4" />
+                      <span className="font-medium text-foreground">{getStageName('delivered')}</span>
+                    </>
                   ) : nextStage && (
                     <>
                       <ArrowRight className="w-4 h-4" />
@@ -250,7 +255,7 @@ export function OrderDetailSheet({
 
                 <div className="flex flex-wrap gap-2">
                   {/* Next stage button (non-shipped transitions) */}
-                  {nextStage && nextStage !== 'shipped' && (
+                  {nextStage && nextStage !== 'shipped' && nextStage !== 'delivered' && (
                     <Button 
                       onClick={() => handleStageTransition(nextStage)}
                       className="gap-2"
@@ -270,9 +275,20 @@ export function OrderDetailSheet({
                       Move to {getStageName('shipped')}
                     </Button>
                   )}
+
+                  {/* Move to Entregado: manual override from shipped */}
+                  {order.fulfillmentStage === 'shipped' && (
+                    <Button
+                      onClick={() => handleStageTransition('delivered')}
+                      className="gap-2"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      Move to {getStageName('delivered')}
+                    </Button>
+                  )}
                   
-                  {/* Issue button - always available unless already shipped */}
-                  {order.fulfillmentStage !== 'issue' && (
+                  {/* Issue button - always available unless already shipped/delivered/issue */}
+                  {order.fulfillmentStage !== 'issue' && order.fulfillmentStage !== 'shipped' && (
                     <Button 
                       variant="destructive" 
                       onClick={() => handleStageTransition('issue')}
