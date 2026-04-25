@@ -13,6 +13,7 @@ export type FulfillmentStage =
   | 'new'
   | 'label'
   | 'shipped'
+  | 'delivered'
   | 'issue';
 
 // For backward compatibility
@@ -48,6 +49,23 @@ export interface OrderItem {
   imageUrl?: string;
 }
 
+// ============ Tracking Detail (from carrier) ============
+export interface TrackingDetail {
+  message?: string;
+  status?: string;
+  status_detail?: string;
+  datetime?: string;
+  source?: string;
+  carrier_code?: string;
+  tracking_location?: {
+    object?: string;
+    city?: string | null;
+    state?: string | null;
+    country?: string | null;
+    zip?: string | null;
+  };
+}
+
 // ============ Shipment ============
 export interface Shipment {
   carrier: string;
@@ -56,6 +74,9 @@ export interface Shipment {
   shippedAt?: string;
   estimatedDelivery?: string;
   labelUrl?: string;
+  trackingStatus?: string;
+  trackingDetails?: TrackingDetail[];
+  deliveredAt?: string;
 }
 
 // ============ Order Event ============
