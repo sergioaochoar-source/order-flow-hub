@@ -209,12 +209,13 @@ export function useAddTracking() {
               if (order.id !== orderId) return order;
               return {
                 ...order,
-                fulfillmentStage: 'shipped',
+                fulfillmentStage: payload.markShipped ? 'shipped' : 'label',
                 shipment: {
                   carrier: payload.carrier,
                   trackingNumber: payload.tracking,
                   service: payload.service,
                   shippedAt: payload.shippedAt || new Date().toISOString(),
+                  labelUrl: payload.labelUrl,
                 },
                 updatedAt: new Date().toISOString(),
               };
