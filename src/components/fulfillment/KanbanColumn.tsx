@@ -13,6 +13,7 @@ const columnConfig: Record<FulfillmentStage, { title: string; color: string }> =
   new: { title: 'Nuevo', color: 'bg-status-new' },
   label: { title: 'Etiquetado', color: 'bg-status-label' },
   shipped: { title: 'Enviado', color: 'bg-status-shipped' },
+  delivered: { title: 'Entregado', color: 'bg-status-delivered' },
   issue: { title: 'Problema', color: 'bg-status-issue' },
 };
 
