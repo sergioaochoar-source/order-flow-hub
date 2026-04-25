@@ -118,7 +118,6 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     console.log("[Webhook] EasyPost event received:", JSON.stringify(payload).slice(0, 500));
 
-    // EasyPost sends events with { description, mode, result, ... }
     const description = payload.description || "";
     const result = payload.result || {};
 
@@ -132,9 +131,8 @@ Deno.serve(async (req) => {
 
     const trackingCode = result.tracking_code;
     const carrier = result.carrier || "";
-    const status = result.status || "unknown"; // pre_transit, in_transit, out_for_delivery, delivered, etc.
+    const status = result.status || "unknown";
     const trackingDetails = result.tracking_details || [];
-    const estDelivery = result.est_delivery_date || null;
 
     if (!trackingCode) {
       console.warn("[Webhook] No tracking_code in event, skipping");
@@ -143,7 +141,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`[Webhook] Tracker update: ${trackingCode} → ${status} (${carrier})`);
+    // 🔒 We ONLY act on `delivered` events. All other tracker updates are ignored.
+    if (status !== "delivered") {
+      console.log(`[Webhook] Ignoring non-delivered event for ${trackingCode}: ${status}`);
+      return new Response(JSON.stringify({ ok: true, ignored: true, status }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log(`[Webhook] Delivered event for ${trackingCode} (${carrier})`);
 
     // Find matching shipment
     const { data: shipment, error: shipErr } = await supabase
@@ -167,111 +173,78 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Update shipment with tracking status
-    const updateData: Record<string, unknown> = {
-      tracking_status: status,
-      tracking_details: trackingDetails,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (estDelivery) {
-      updateData.estimated_delivery = estDelivery;
-    }
-
-    if (status === "delivered") {
-      updateData.delivered_at = new Date().toISOString();
-    }
-
+    // Update shipment with delivery info & tracking_details (for proof images / event log)
+    const deliveredAt = new Date().toISOString();
     const { error: updateErr } = await supabase
       .from("shipments")
-      .update(updateData)
+      .update({
+        tracking_status: "delivered",
+        tracking_details: trackingDetails,
+        delivered_at: deliveredAt,
+        updated_at: deliveredAt,
+      })
       .eq("order_id", shipment.order_id);
 
     if (updateErr) {
       console.error("[Webhook] Error updating shipment:", updateErr);
-    } else {
-      console.log(`[Webhook] Updated shipment for order ${shipment.order_id}: ${status}`);
     }
 
-    // Auto-transition: when carrier scans package (in_transit or later), move to "shipped"
-    const SHIPPED_STATUSES = ["in_transit", "out_for_delivery", "delivered", "available_for_pickup"];
-    if (SHIPPED_STATUSES.includes(status)) {
-      // Check current stage - only auto-advance from "label" to "shipped"
-      const { data: currentOrder } = await supabase
+    // Auto-transition to "delivered" stage (from shipped or label)
+    const { data: currentOrder } = await supabase
+      .from("orders")
+      .select("fulfillment_stage")
+      .eq("id", shipment.order_id)
+      .single();
+
+    if (currentOrder && currentOrder.fulfillment_stage !== "delivered") {
+      const { error: stageErr } = await supabase
         .from("orders")
-        .select("fulfillment_stage")
-        .eq("id", shipment.order_id)
-        .single();
-
-      if (currentOrder && currentOrder.fulfillment_stage === "label") {
-        const { error: stageErr } = await supabase
-          .from("orders")
-          .update({ fulfillment_stage: "shipped", updated_at: new Date().toISOString() })
-          .eq("id", shipment.order_id);
-
-        if (stageErr) {
-          console.error("[Webhook] Error auto-transitioning to shipped:", stageErr);
-        } else {
-          console.log(`[Webhook] Auto-transitioned order ${shipment.order_id} to shipped`);
-          await supabase.from("order_events").insert({
-            order_id: shipment.order_id,
-            type: "fulfillment_change",
-            message: `Auto-transitioned to shipped: carrier scanned (${STATUS_LABELS[status] || status})`,
-            meta: { from_stage: "label", to_stage: "shipped", trigger: status },
-          });
-        }
-      }
-    }
-
-    // If delivered, update order status and send email
-    if (status === "delivered") {
-      const { error: orderErr } = await supabase
-        .from("orders")
-        .update({ status: "completed", updated_at: new Date().toISOString() })
+        .update({
+          fulfillment_stage: "delivered",
+          status: "completed",
+          updated_at: deliveredAt,
+        })
         .eq("id", shipment.order_id);
 
-      if (orderErr) {
-        console.error("[Webhook] Error updating order status:", orderErr);
+      if (stageErr) {
+        console.error("[Webhook] Error transitioning to delivered:", stageErr);
+      } else {
+        console.log(`[Webhook] Order ${shipment.order_id} → delivered`);
+        await supabase.from("order_events").insert({
+          order_id: shipment.order_id,
+          type: "fulfillment_change",
+          message: `Auto-transitioned to delivered (carrier confirmed)`,
+          meta: { from_stage: currentOrder.fulfillment_stage, to_stage: "delivered", trigger: "easypost_webhook" },
+        });
       }
-
-      // Fetch order for email
-      const { data: order } = await supabase
-        .from("orders")
-        .select("order_number, customer_name, customer_email")
-        .eq("id", shipment.order_id)
-        .single();
-
-      if (order?.customer_email) {
-        const email = getDeliveredEmail(
-          order.order_number,
-          order.customer_name || "",
-          carrier,
-          trackingCode
-        );
-        const emailResult = await sendEmail(order.customer_email, email.subject, email.html);
-        if (emailResult) {
-          console.log(`[Webhook] Delivery email sent to ${order.customer_email}`);
-        }
-      }
-
-      // Log event
-      await supabase.from("order_events").insert({
-        order_id: shipment.order_id,
-        type: "delivered",
-        message: `Package delivered via ${carrier} (${trackingCode})`,
-        meta: { status, carrier, tracking_code: trackingCode },
-      });
     }
 
-    // Log tracker update event
-    if (status !== "delivered") {
-      await supabase.from("order_events").insert({
-        order_id: shipment.order_id,
-        type: "tracking_update",
-        message: `Tracking status: ${STATUS_LABELS[status] || status}`,
-        meta: { status, carrier, tracking_code: trackingCode },
-      });
+    // Fetch order for email
+    const { data: order } = await supabase
+      .from("orders")
+      .select("order_number, customer_name, customer_email")
+      .eq("id", shipment.order_id)
+      .single();
+
+    if (order?.customer_email) {
+      const email = getDeliveredEmail(
+        order.order_number,
+        order.customer_name || "",
+        carrier,
+        trackingCode
+      );
+      const emailResult = await sendEmail(order.customer_email, email.subject, email.html);
+      if (emailResult) {
+        console.log(`[Webhook] Delivery email sent to ${order.customer_email}`);
+      }
     }
+
+    await supabase.from("order_events").insert({
+      order_id: shipment.order_id,
+      type: "delivered",
+      message: `Package delivered via ${carrier} (${trackingCode})`,
+      meta: { status, carrier, tracking_code: trackingCode },
+    });
 
     return new Response(
       JSON.stringify({ ok: true, status, order_id: shipment.order_id }),

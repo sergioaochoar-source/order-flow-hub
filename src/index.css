@@ -45,6 +45,7 @@
     --status-pack: 45 93% 47%;
     --status-label: 173 80% 40%;
     --status-shipped: 142 71% 45%;
+    --status-delivered: 158 64% 32%;
     --status-issue: 0 84% 60%;
 
     /* Sidebar */
@@ -142,6 +143,10 @@
 
   .status-shipped {
     @apply bg-[hsl(var(--status-shipped)/0.1)] text-[hsl(var(--status-shipped))];
+  }
+
+  .status-delivered {
+    @apply bg-[hsl(var(--status-delivered)/0.15)] text-[hsl(var(--status-delivered))];
   }
 
   .status-issue {

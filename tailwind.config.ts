@@ -75,6 +75,7 @@ export default {
           pack: "hsl(var(--status-pack))",
           label: "hsl(var(--status-label))",
           shipped: "hsl(var(--status-shipped))",
+          delivered: "hsl(var(--status-delivered))",
           issue: "hsl(var(--status-issue))",
         },
       },

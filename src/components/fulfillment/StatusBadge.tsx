@@ -10,6 +10,7 @@ const statusConfig: Record<FulfillmentStage, { label: string; className: string 
   new: { label: 'Nuevo', className: 'status-new' },
   label: { label: 'Etiquetado', className: 'status-label' },
   shipped: { label: 'Enviado', className: 'status-shipped' },
+  delivered: { label: 'Entregado', className: 'status-delivered' },
   issue: { label: 'Problema', className: 'status-issue' },
 };
 

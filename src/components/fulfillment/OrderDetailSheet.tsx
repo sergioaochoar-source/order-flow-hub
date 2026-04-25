@@ -20,6 +20,7 @@ import {
 import { StatusBadge } from './StatusBadge';
 import { ShipConfirmDialog } from './ShipConfirmDialog';
 import { ShipWithTrackingDialog } from './ShipWithTrackingDialog';
+import { DeliveredInfo } from './DeliveredInfo';
 import { ShippingRatesDialog } from '@/components/shipping/ShippingRatesDialog';
 import { Order, FulfillmentStage, TrackingPayload } from '@/types/order';
 import { useAddTracking } from '@/hooks/useOrders';
@@ -80,17 +81,17 @@ export function OrderDetailSheet({
       return;
     }
 
-    // Prepare tracking payload and show confirmation dialog
     const payload: TrackingPayload = {
       carrier,
       tracking: trackingNumber,
       shippedAt: new Date().toISOString(),
+      markShipped: true,
     };
     setPendingPayload(payload);
     setShowShipConfirm(true);
   };
 
-  // Handle label purchased from EasyPost
+  // Label purchased via EasyPost — order goes to "label" (no auto-ship)
   const handleLabelPurchased = async (trackingNum: string, carrierName: string, labelUrl: string) => {
     addTrackingMutation.mutate(
       { 
@@ -100,6 +101,7 @@ export function OrderDetailSheet({
           tracking: trackingNum,
           shippedAt: new Date().toISOString(),
           labelUrl,
+          markShipped: false,
         }
       },
       {
@@ -116,9 +118,8 @@ export function OrderDetailSheet({
             updatedAt: new Date().toISOString(),
           };
           onUpdateOrder(updatedOrder);
-          toast.success(`Etiqueta comprada para ${order.orderNumber}. Se moverá a Enviado cuando el carrier escanee.`);
+          toast.success(`Etiqueta comprada para ${order.orderNumber}. Marca como Enviado cuando despaches el paquete.`);
           setIsRatesDialogOpen(false);
-          // Open label PDF
           const proxyUrl = getLabelPdfProxyUrl(labelUrl);
           window.open(proxyUrl, '_blank');
           onOpenChange(false);
@@ -133,11 +134,10 @@ export function OrderDetailSheet({
     addTrackingMutation.mutate(
       {
         orderId: order.id,
-        payload: pendingPayload,
+        payload: { ...pendingPayload, markShipped: true },
       },
       {
         onSuccess: async () => {
-          // Update local state for immediate feedback
           const updatedOrder: Order = {
             ...order,
             fulfillmentStage: 'shipped',
@@ -151,7 +151,6 @@ export function OrderDetailSheet({
           };
           onUpdateOrder(updatedOrder);
           
-          // Send shipping confirmation email
           if (order.customer.email) {
             try {
               await sendShippingConfirmation({
@@ -168,7 +167,6 @@ export function OrderDetailSheet({
             }
           }
           
-          // Reset state
           setShowShipConfirm(false);
           setPendingPayload(null);
           setTrackingNumber('');
@@ -182,16 +180,16 @@ export function OrderDetailSheet({
     );
   };
 
-  // Handle "Move to Enviado" from the workflow button (label → shipped)
+  // "Move to Enviado" button → prompts for tracking → ships
   const handleShipWithTrackingConfirm = (carrierName: string, trackingNum: string) => {
     const payload: TrackingPayload = {
       carrier: carrierName,
       tracking: trackingNum,
       shippedAt: new Date().toISOString(),
+      markShipped: true,
     };
     setPendingPayload(payload);
     setShowShipWithTracking(false);
-    // Reuse existing confirmation flow which saves tracking + sends email
     setShowShipConfirm(true);
   };
 
@@ -229,7 +227,7 @@ export function OrderDetailSheet({
 
           <div className="space-y-6">
             {/* Quick Actions - Workflow */}
-            {order.fulfillmentStage !== 'shipped' && (
+            {order.fulfillmentStage !== 'delivered' && (
               <div className="space-y-3">
                 <h4 className="font-semibold text-sm text-foreground">Workflow Actions</h4>
                 
@@ -242,6 +240,11 @@ export function OrderDetailSheet({
                       <ArrowRight className="w-4 h-4" />
                       <span className="font-medium text-foreground">{getStageName('shipped')}</span>
                     </>
+                  ) : order.fulfillmentStage === 'shipped' ? (
+                    <>
+                      <ArrowRight className="w-4 h-4" />
+                      <span className="font-medium text-foreground">{getStageName('delivered')}</span>
+                    </>
                   ) : nextStage && (
                     <>
                       <ArrowRight className="w-4 h-4" />
@@ -252,7 +255,7 @@ export function OrderDetailSheet({
 
                 <div className="flex flex-wrap gap-2">
                   {/* Next stage button (non-shipped transitions) */}
-                  {nextStage && nextStage !== 'shipped' && (
+                  {nextStage && nextStage !== 'shipped' && nextStage !== 'delivered' && (
                     <Button 
                       onClick={() => handleStageTransition(nextStage)}
                       className="gap-2"
@@ -272,9 +275,20 @@ export function OrderDetailSheet({
                       Move to {getStageName('shipped')}
                     </Button>
                   )}
+
+                  {/* Move to Entregado: manual override from shipped */}
+                  {order.fulfillmentStage === 'shipped' && (
+                    <Button
+                      onClick={() => handleStageTransition('delivered')}
+                      className="gap-2"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      Move to {getStageName('delivered')}
+                    </Button>
+                  )}
                   
-                  {/* Issue button - always available unless already shipped */}
-                  {order.fulfillmentStage !== 'issue' && (
+                  {/* Issue button - always available unless already shipped/delivered/issue */}
+                  {order.fulfillmentStage !== 'issue' && order.fulfillmentStage !== 'shipped' && (
                     <Button 
                       variant="destructive" 
                       onClick={() => handleStageTransition('issue')}
@@ -384,21 +398,28 @@ export function OrderDetailSheet({
                   <span className="font-medium">{order.shippingMethod}</span>
                 </p>
 
-                {order.fulfillmentStage === 'shipped' && order.shipment ? (
+                {order.fulfillmentStage === 'delivered' && order.shipment ? (
+                  <DeliveredInfo shipment={order.shipment} />
+                ) : order.fulfillmentStage === 'shipped' && order.shipment ? (
                   <div className="bg-success/10 p-3 rounded-lg">
                     <p className="text-sm font-medium text-success">✓ Shipped</p>
                     <p className="text-sm text-muted-foreground mt-1">
                       {order.shipment.carrier}: {order.shipment.trackingNumber}
                     </p>
+                    {order.shipment.shippedAt && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Despachado: {format(new Date(order.shipment.shippedAt), 'PPp')}
+                      </p>
+                    )}
                   </div>
                 ) : order.fulfillmentStage === 'label' && order.shipment ? (
                   <div className="bg-primary/10 p-3 rounded-lg">
-                    <p className="text-sm font-medium text-primary">📋 Etiqueta comprada</p>
+                    <p className="text-sm font-medium text-primary">📋 Etiqueta lista</p>
                     <p className="text-sm text-muted-foreground mt-1">
                       {order.shipment.carrier}: {order.shipment.trackingNumber}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Se moverá a Enviado automáticamente cuando el carrier escanee el paquete.
+                      Marca como Enviado cuando despaches el paquete con el carrier.
                     </p>
                   </div>
                 ) : (order.fulfillmentStage === 'new' || order.fulfillmentStage === 'label') ? (

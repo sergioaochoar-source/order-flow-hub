@@ -38,7 +38,7 @@ function normalizeFulfillmentStage(stage: string): FulfillmentStage {
   const stageMap: Record<string, FulfillmentStage> = {
     'new': 'new',
     'paid': 'new',
-    'qc': 'label',           // Map old stages to simplified flow
+    'qc': 'label',
     'quality_control': 'label',
     'pick': 'label',
     'picking': 'label',
@@ -49,6 +49,7 @@ function normalizeFulfillmentStage(stage: string): FulfillmentStage {
     'labelled': 'label',
     'shipped': 'shipped',
     'dispatched': 'shipped',
+    'delivered': 'delivered',
     'issue': 'issue',
     'problem': 'issue',
     'hold': 'issue',
@@ -119,6 +120,12 @@ function normalizeShipment(raw: Record<string, unknown>): Shipment | undefined {
     service: raw.service ? String(raw.service) : undefined,
     shippedAt: raw.shippedAt || raw.shipped_at ? String(raw.shippedAt || raw.shipped_at) : undefined,
     estimatedDelivery: raw.estimatedDelivery || raw.estimated_delivery ? String(raw.estimatedDelivery || raw.estimated_delivery) : undefined,
+    labelUrl: raw.labelUrl || raw.label_url ? String(raw.labelUrl || raw.label_url) : undefined,
+    trackingStatus: raw.trackingStatus || raw.tracking_status ? String(raw.trackingStatus || raw.tracking_status) : undefined,
+    trackingDetails: Array.isArray(raw.trackingDetails || raw.tracking_details)
+      ? ((raw.trackingDetails || raw.tracking_details) as unknown[]) as Shipment['trackingDetails']
+      : undefined,
+    deliveredAt: raw.deliveredAt || raw.delivered_at ? String(raw.deliveredAt || raw.delivered_at) : undefined,
   };
 }
 

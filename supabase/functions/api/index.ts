@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Stage transition rules (simplified workflow)
-const STAGE_ORDER = ["new", "label", "shipped"] as const;
+const STAGE_ORDER = ["new", "label", "shipped", "delivered"] as const;
 type FulfillmentStage = typeof STAGE_ORDER[number] | "issue";
 
 function getStageIndex(stage: string): number {
@@ -15,25 +15,41 @@ function getStageIndex(stage: string): number {
 }
 
 function isValidTransition(fromStage: string, toStage: string): { valid: boolean; message?: string } {
-  // To shipped requires tracking endpoint
-  if (toStage === "shipped") {
-    return { valid: false, message: "Use tracking endpoint to mark as shipped" };
-  }
-
-  // From issue can go to any stage except shipped
-  if (fromStage === "issue") {
-    if (toStage === "shipped") {
-      return { valid: false, message: "Cannot go directly from issue to shipped" };
+  // To issue is always allowed (except from delivered)
+  if (toStage === "issue") {
+    if (fromStage === "delivered") {
+      return { valid: false, message: "Cannot mark a delivered order as issue" };
     }
     return { valid: true };
   }
 
-  // To issue is always allowed
-  if (toStage === "issue") {
+  // From delivered: terminal
+  if (fromStage === "delivered") {
+    return { valid: false, message: "Delivered orders are final" };
+  }
+
+  // From issue: only back to new/label
+  if (fromStage === "issue") {
+    if (toStage === "new" || toStage === "label") return { valid: true };
+    return { valid: false, message: `Cannot go from issue to ${toStage}` };
+  }
+
+  // To delivered: only from shipped
+  if (toStage === "delivered") {
+    if (fromStage !== "shipped") {
+      return { valid: false, message: "Can only mark as delivered from shipped" };
+    }
     return { valid: true };
   }
 
-  // Normal flow: can move forward one step or backward
+  // To shipped: allowed only from label (tracking is verified by caller)
+  if (toStage === "shipped") {
+    if (fromStage !== "label") {
+      return { valid: false, message: "Orders must be in label stage before shipped" };
+    }
+    return { valid: true };
+  }
+
   const fromIdx = getStageIndex(fromStage);
   const toIdx = getStageIndex(toStage);
 
@@ -41,7 +57,6 @@ function isValidTransition(fromStage: string, toStage: string): { valid: boolean
     return { valid: false, message: "Invalid stage" };
   }
 
-  // Allow forward by 1 or any backward
   if (toIdx === fromIdx + 1 || toIdx < fromIdx) {
     return { valid: true };
   }
@@ -187,7 +202,11 @@ Deno.serve(async (req) => {
           trackingNumber: shipmentsResult.data.find(s => s.order_id === order.id)!.tracking_number,
           service: shipmentsResult.data.find(s => s.order_id === order.id)!.service,
           shippedAt: shipmentsResult.data.find(s => s.order_id === order.id)!.shipped_at,
+          estimatedDelivery: shipmentsResult.data.find(s => s.order_id === order.id)!.estimated_delivery,
           labelUrl: shipmentsResult.data.find(s => s.order_id === order.id)!.label_url,
+          trackingStatus: shipmentsResult.data.find(s => s.order_id === order.id)!.tracking_status,
+          trackingDetails: shipmentsResult.data.find(s => s.order_id === order.id)!.tracking_details,
+          deliveredAt: shipmentsResult.data.find(s => s.order_id === order.id)!.delivered_at,
         } : undefined,
         notes: order.notes,
         events: eventsResult.data?.filter(e => e.order_id === order.id).map(e => ({
@@ -267,6 +286,11 @@ Deno.serve(async (req) => {
           trackingNumber: shipmentResult.data.tracking_number,
           service: shipmentResult.data.service,
           shippedAt: shipmentResult.data.shipped_at,
+          estimatedDelivery: shipmentResult.data.estimated_delivery,
+          labelUrl: shipmentResult.data.label_url,
+          trackingStatus: shipmentResult.data.tracking_status,
+          trackingDetails: shipmentResult.data.tracking_details,
+          deliveredAt: shipmentResult.data.delivered_at,
         } : undefined,
         notes: order.notes,
         events: eventsResult.data?.map(e => ({
@@ -361,7 +385,7 @@ Deno.serve(async (req) => {
     if (pathParts[0] === "orders" && pathParts[2] === "tracking" && req.method === "POST") {
       const orderId = pathParts[1];
       const body = await req.json();
-      const { carrier, tracking, service, shippedAt, orderStatus, labelUrl } = body;
+      const { carrier, tracking, service, shippedAt, orderStatus, labelUrl, markShipped } = body;
 
       if (!carrier || !tracking) {
         return new Response(JSON.stringify({ error: "carrier and tracking are required" }), {
@@ -403,8 +427,11 @@ Deno.serve(async (req) => {
 
       if (shipmentError) throw shipmentError;
 
-      // Update order stage to "label" (will auto-transition to "shipped" when carrier scans)
-      const updateData: Record<string, string> = { fulfillment_stage: "label" };
+      // Stage transition:
+      //  - markShipped=true → directly to "shipped" (manual ship action with tracking)
+      //  - otherwise → "label" (e.g. label purchased, tracking only)
+      const targetStage = markShipped ? "shipped" : "label";
+      const updateData: Record<string, string> = { fulfillment_stage: targetStage };
       if (orderStatus) {
         updateData.status = orderStatus;
       }
@@ -419,9 +446,11 @@ Deno.serve(async (req) => {
       // Create event
       await supabase.from("order_events").insert({
         order_id: orderId,
-        type: "tracking_added",
-        message: `Tracking added: ${carrier} ${tracking}`,
-        meta: { carrier, tracking, service, labelUrl },
+        type: markShipped ? "fulfillment_change" : "tracking_added",
+        message: markShipped
+          ? `Marked as shipped with tracking ${carrier} ${tracking}`
+          : `Tracking added: ${carrier} ${tracking}`,
+        meta: { carrier, tracking, service, labelUrl, markShipped: !!markShipped },
       });
 
       // Return updated order
@@ -448,7 +477,11 @@ Deno.serve(async (req) => {
           trackingNumber: shipment.tracking_number,
           service: shipment.service,
           shippedAt: shipment.shipped_at,
+          estimatedDelivery: shipment.estimated_delivery,
           labelUrl: shipment.label_url,
+          trackingStatus: shipment.tracking_status,
+          trackingDetails: shipment.tracking_details,
+          deliveredAt: shipment.delivered_at,
         },
         updatedAt: updatedOrder.updated_at,
       }), {
